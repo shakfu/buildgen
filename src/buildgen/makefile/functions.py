@@ -1,29 +1,38 @@
-"""Makefile function helpers and automatic variables."""
+"""Makefile function helpers and automatic variables.
+
+Usage:
+    from buildgen.makefile.functions import Mk
+
+    Mk.wildcard("*.cpp")           # $(wildcard *.cpp)
+    Mk.patsubst("%.cpp", "%.o", "$(SOURCES)")
+    Mk.shell("pkg-config --cflags libfoo")
+"""
 
 from typing import Optional
+
 
 # Makefile automatic variables reference
 AUTOMATIC_VARIABLES = {
     "$@": "The file name of the target of the rule.",
     "$%": "The target member name, when the target is an archive member.",
     "$<": "The name of the first prerequisite.",
-    "$?": "The names of all the prerequisites that are newer than the target, with spaces between them.",
+    "$?": "The names of all the prerequisites that are newer than the target.",
     "$^": "The names of all the prerequisites, with spaces between them.",
-    "$+": "This is like `$^`, but prerequisites listed more than once are duplicated in the order they were listed in the makefile.",
-    "$|": "The names of all the order-only prerequisites, with spaces between them.",
+    "$+": "Like $^, but prerequisites listed more than once are duplicated.",
+    "$|": "The names of all the order-only prerequisites.",
     "$*": "The stem with which an implicit rule matches.",
-    "$(@D)": "The directory part of the file name of the target, with the trailing slash removed.",
-    "$(@F)": "The file-within-directory part of the file name of the target.",
+    "$(@D)": "The directory part of the target file name.",
+    "$(@F)": "The file-within-directory part of the target.",
     "$(*D)": "The directory part of the stem.",
     "$(*F)": "The file-within-directory part of the stem.",
     "$(%D)": "The directory part of the target archive member name.",
-    "$(%F)": "The file-within-directory part of the target archive member name.",
-    "$(^D)": "Lists of the directory parts of all prerequisites.",
-    "$(^F)": "Lists of the file-within-directory parts of all prerequisites.",
-    "$(+D)": "Lists of the directory parts of all prerequisites, including multiple instances of duplicated prerequisites.",
-    "$(+F)": "Lists of the file-within-directory parts of all prerequisites, including multiple instances of duplicated prerequisites.",
-    "$(?D)": "Lists of the directory parts of all prerequisites that are newer than the target.",
-    "$(?F)": "Lists of the file-within-directory parts of all prerequisites that are newer than the target.",
+    "$(%F)": "The file-within-directory part of the archive member name.",
+    "$(^D)": "Directory parts of all prerequisites.",
+    "$(^F)": "File-within-directory parts of all prerequisites.",
+    "$(+D)": "Directory parts of all prerequisites (with duplicates).",
+    "$(+F)": "File-within-directory parts of all prerequisites (with duplicates).",
+    "$(?D)": "Directory parts of prerequisites newer than the target.",
+    "$(?F)": "File-within-directory parts of prerequisites newer than the target.",
 }
 
 
@@ -39,196 +48,200 @@ def get_auto_var_help(var: Optional[str] = None) -> str:
     if var:
         if var in AUTOMATIC_VARIABLES:
             return f"{var}: {AUTOMATIC_VARIABLES[var]}"
-        else:
-            raise ValueError(f"Invalid automatic variable: {var}")
+        raise ValueError(f"Invalid automatic variable: {var}")
 
-    help_text = "Makefile Automatic Variables:\n"
+    lines = ["Makefile Automatic Variables:"]
     for var_name, description in AUTOMATIC_VARIABLES.items():
-        help_text += f"  {var_name}: {description}\n"
-    return help_text
-
-
-# String/filename functions
-
-
-def makefile_wildcard(*patterns: str) -> str:
-    """Generate a Makefile wildcard function call."""
-    pattern_list = " ".join(patterns)
-    return f"$(wildcard {pattern_list})"
-
-
-def makefile_patsubst(pattern: str, replacement: str, text: str) -> str:
-    """Generate a Makefile patsubst function call."""
-    return f"$(patsubst {pattern},{replacement},{text})"
-
-
-def makefile_subst(from_str: str, to_str: str, text: str) -> str:
-    """Generate a Makefile subst function call."""
-    return f"$(subst {from_str},{to_str},{text})"
-
-
-def makefile_filter(patterns: str, text: str) -> str:
-    """Generate a Makefile filter function call."""
-    return f"$(filter {patterns},{text})"
-
-
-def makefile_filter_out(patterns: str, text: str) -> str:
-    """Generate a Makefile filter-out function call."""
-    return f"$(filter-out {patterns},{text})"
-
-
-def makefile_sort(text: str) -> str:
-    """Generate a Makefile sort function call."""
-    return f"$(sort {text})"
-
-
-def makefile_word(n: int, text: str) -> str:
-    """Generate a Makefile word function call."""
-    return f"$(word {n},{text})"
-
-
-def makefile_words(text: str) -> str:
-    """Generate a Makefile words function call."""
-    return f"$(words {text})"
-
-
-def makefile_wordlist(start: int, end: int, text: str) -> str:
-    """Generate a Makefile wordlist function call."""
-    return f"$(wordlist {start},{end},{text})"
-
-
-def makefile_firstword(text: str) -> str:
-    """Generate a Makefile firstword function call."""
-    return f"$(firstword {text})"
-
-
-def makefile_lastword(text: str) -> str:
-    """Generate a Makefile lastword function call."""
-    return f"$(lastword {text})"
-
-
-# Filename functions
-
-
-def makefile_dir(names: str) -> str:
-    """Generate a Makefile dir function call."""
-    return f"$(dir {names})"
-
-
-def makefile_notdir(names: str) -> str:
-    """Generate a Makefile notdir function call."""
-    return f"$(notdir {names})"
-
-
-def makefile_suffix(names: str) -> str:
-    """Generate a Makefile suffix function call."""
-    return f"$(suffix {names})"
-
-
-def makefile_basename(names: str) -> str:
-    """Generate a Makefile basename function call."""
-    return f"$(basename {names})"
-
-
-def makefile_addsuffix(suffix: str, names: str) -> str:
-    """Generate a Makefile addsuffix function call."""
-    return f"$(addsuffix {suffix},{names})"
-
-
-def makefile_addprefix(prefix: str, names: str) -> str:
-    """Generate a Makefile addprefix function call."""
-    return f"$(addprefix {prefix},{names})"
-
-
-def makefile_join(list1: str, list2: str) -> str:
-    """Generate a Makefile join function call."""
-    return f"$(join {list1},{list2})"
-
-
-def makefile_realpath(names: str) -> str:
-    """Generate a Makefile realpath function call."""
-    return f"$(realpath {names})"
-
-
-def makefile_abspath(names: str) -> str:
-    """Generate a Makefile abspath function call."""
-    return f"$(abspath {names})"
-
-
-# Conditional functions
-
-
-def makefile_if(condition: str, then_part: str, else_part: str = "") -> str:
-    """Generate a Makefile if function call."""
-    if else_part:
-        return f"$(if {condition},{then_part},{else_part})"
-    return f"$(if {condition},{then_part})"
-
-
-def makefile_or(*conditions: str) -> str:
-    """Generate a Makefile or function call."""
-    condition_list = ",".join(conditions)
-    return f"$(or {condition_list})"
-
-
-def makefile_and(*conditions: str) -> str:
-    """Generate a Makefile and function call."""
-    condition_list = ",".join(conditions)
-    return f"$(and {condition_list})"
-
-
-# Control functions
-
-
-def makefile_foreach(var: str, list_: str, text: str) -> str:
-    """Generate a Makefile foreach function call."""
-    return f"$(foreach {var},{list_},{text})"
-
-
-def makefile_call(variable: str, *params: str) -> str:
-    """Generate a Makefile call function call."""
-    if params:
-        param_list = ",".join(params)
-        return f"$(call {variable},{param_list})"
-    return f"$(call {variable})"
-
-
-def makefile_eval(text: str) -> str:
-    """Generate a Makefile eval function call."""
-    return f"$(eval {text})"
-
-
-# Variable functions
-
-
-def makefile_origin(variable: str) -> str:
-    """Generate a Makefile origin function call."""
-    return f"$(origin {variable})"
-
-
-def makefile_flavor(variable: str) -> str:
-    """Generate a Makefile flavor function call."""
-    return f"$(flavor {variable})"
-
-
-def makefile_value(variable: str) -> str:
-    """Generate a Makefile value function call."""
-    return f"$(value {variable})"
-
-
-# Shell and misc functions
-
-
-def makefile_shell(command: str) -> str:
-    """Generate a Makefile shell function call."""
-    return f"$(shell {command})"
-
-
-def makefile_strip(text: str) -> str:
-    """Generate a Makefile strip function call."""
-    return f"$(strip {text})"
-
-
-def makefile_findstring(find: str, text: str) -> str:
-    """Generate a Makefile findstring function call."""
-    return f"$(findstring {find},{text})"
+        lines.append(f"  {var_name}: {description}")
+    return "\n".join(lines)
+
+
+class Mk:
+    """Makefile function generators.
+
+    Generates Makefile function call syntax as strings.
+    All methods are static - no instance needed.
+
+    Usage:
+        from buildgen.makefile.functions import Mk
+
+        Mk.wildcard("src/*.cpp")        # $(wildcard src/*.cpp)
+        Mk.patsubst("%.cpp", "%.o", x)  # $(patsubst %.cpp,%.o,x)
+        Mk.shell("date +%Y")            # $(shell date +%Y)
+    """
+
+    # String functions
+
+    @staticmethod
+    def wildcard(*patterns: str) -> str:
+        """$(wildcard pattern...) - Expand wildcards."""
+        return f"$(wildcard {' '.join(patterns)})"
+
+    @staticmethod
+    def patsubst(pattern: str, replacement: str, text: str) -> str:
+        """$(patsubst pattern,replacement,text) - Pattern substitution."""
+        return f"$(patsubst {pattern},{replacement},{text})"
+
+    @staticmethod
+    def subst(from_str: str, to_str: str, text: str) -> str:
+        """$(subst from,to,text) - Simple substitution."""
+        return f"$(subst {from_str},{to_str},{text})"
+
+    @staticmethod
+    def filter(patterns: str, text: str) -> str:
+        """$(filter pattern...,text) - Keep matching words."""
+        return f"$(filter {patterns},{text})"
+
+    @staticmethod
+    def filter_out(patterns: str, text: str) -> str:
+        """$(filter-out pattern...,text) - Remove matching words."""
+        return f"$(filter-out {patterns},{text})"
+
+    @staticmethod
+    def sort(text: str) -> str:
+        """$(sort list) - Sort and deduplicate."""
+        return f"$(sort {text})"
+
+    @staticmethod
+    def word(n: int, text: str) -> str:
+        """$(word n,text) - Get nth word (1-indexed)."""
+        return f"$(word {n},{text})"
+
+    @staticmethod
+    def words(text: str) -> str:
+        """$(words text) - Count words."""
+        return f"$(words {text})"
+
+    @staticmethod
+    def wordlist(start: int, end: int, text: str) -> str:
+        """$(wordlist start,end,text) - Get word range."""
+        return f"$(wordlist {start},{end},{text})"
+
+    @staticmethod
+    def firstword(text: str) -> str:
+        """$(firstword text) - Get first word."""
+        return f"$(firstword {text})"
+
+    @staticmethod
+    def lastword(text: str) -> str:
+        """$(lastword text) - Get last word."""
+        return f"$(lastword {text})"
+
+    @staticmethod
+    def strip(text: str) -> str:
+        """$(strip text) - Remove leading/trailing whitespace."""
+        return f"$(strip {text})"
+
+    @staticmethod
+    def findstring(find: str, text: str) -> str:
+        """$(findstring find,text) - Search for substring."""
+        return f"$(findstring {find},{text})"
+
+    # Filename functions
+
+    @staticmethod
+    def dir(names: str) -> str:
+        """$(dir names...) - Extract directory part."""
+        return f"$(dir {names})"
+
+    @staticmethod
+    def notdir(names: str) -> str:
+        """$(notdir names...) - Extract non-directory part."""
+        return f"$(notdir {names})"
+
+    @staticmethod
+    def suffix(names: str) -> str:
+        """$(suffix names...) - Extract suffix."""
+        return f"$(suffix {names})"
+
+    @staticmethod
+    def basename(names: str) -> str:
+        """$(basename names...) - Extract basename (without suffix)."""
+        return f"$(basename {names})"
+
+    @staticmethod
+    def addsuffix(suffix: str, names: str) -> str:
+        """$(addsuffix suffix,names) - Add suffix to each word."""
+        return f"$(addsuffix {suffix},{names})"
+
+    @staticmethod
+    def addprefix(prefix: str, names: str) -> str:
+        """$(addprefix prefix,names) - Add prefix to each word."""
+        return f"$(addprefix {prefix},{names})"
+
+    @staticmethod
+    def join(list1: str, list2: str) -> str:
+        """$(join list1,list2) - Join corresponding words."""
+        return f"$(join {list1},{list2})"
+
+    @staticmethod
+    def realpath(names: str) -> str:
+        """$(realpath names...) - Canonical absolute path."""
+        return f"$(realpath {names})"
+
+    @staticmethod
+    def abspath(names: str) -> str:
+        """$(abspath names...) - Absolute path (no symlink resolution)."""
+        return f"$(abspath {names})"
+
+    # Conditional functions
+
+    @staticmethod
+    def if_(condition: str, then_part: str, else_part: str = "") -> str:
+        """$(if condition,then[,else]) - Conditional."""
+        if else_part:
+            return f"$(if {condition},{then_part},{else_part})"
+        return f"$(if {condition},{then_part})"
+
+    @staticmethod
+    def or_(*conditions: str) -> str:
+        """$(or condition...) - Logical OR."""
+        return f"$(or {','.join(conditions)})"
+
+    @staticmethod
+    def and_(*conditions: str) -> str:
+        """$(and condition...) - Logical AND."""
+        return f"$(and {','.join(conditions)})"
+
+    # Control functions
+
+    @staticmethod
+    def foreach(var: str, list_: str, text: str) -> str:
+        """$(foreach var,list,text) - Loop expansion."""
+        return f"$(foreach {var},{list_},{text})"
+
+    @staticmethod
+    def call(variable: str, *params: str) -> str:
+        """$(call variable,param...) - Call user-defined function."""
+        if params:
+            return f"$(call {variable},{','.join(params)})"
+        return f"$(call {variable})"
+
+    @staticmethod
+    def eval(text: str) -> str:
+        """$(eval text) - Evaluate as Makefile syntax."""
+        return f"$(eval {text})"
+
+    # Variable functions
+
+    @staticmethod
+    def origin(variable: str) -> str:
+        """$(origin variable) - Get variable origin."""
+        return f"$(origin {variable})"
+
+    @staticmethod
+    def flavor(variable: str) -> str:
+        """$(flavor variable) - Get variable flavor."""
+        return f"$(flavor {variable})"
+
+    @staticmethod
+    def value(variable: str) -> str:
+        """$(value variable) - Get unexpanded value."""
+        return f"$(value {variable})"
+
+    # Shell function
+
+    @staticmethod
+    def shell(command: str) -> str:
+        """$(shell command) - Execute shell command."""
+        return f"$(shell {command})"

@@ -1,4 +1,5 @@
-.PHONY: all test coverage coverage-html lint format format-check typecheck build check publish clean
+.PHONY: all test coverage coverage-html lint format format-check typecheck \
+		build check publish clean
 
 all: test
 

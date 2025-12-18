@@ -5,17 +5,7 @@ from typing import Optional
 from buildgen.common.utils import UniqueList, PathLike
 from buildgen.common.base import BaseGenerator
 from buildgen.cmake.variables import CMakeVar, CMakeCacheVar, CMakeOption
-from buildgen.cmake.functions import (
-    cmake_minimum_required,
-    cmake_project,
-    cmake_add_executable,
-    cmake_add_library,
-    cmake_target_link_libraries,
-    cmake_target_include_directories,
-    cmake_target_compile_definitions,
-    cmake_target_compile_options,
-    cmake_find_package,
-)
+from buildgen.cmake.functions import Cm
 
 
 class CMakeWriter:
@@ -246,12 +236,12 @@ class CMakeListsGenerator(BaseGenerator):
 
     def _write_header(self) -> None:
         """Write CMake header (minimum version, project)."""
-        self.write(cmake_minimum_required(self.cmake_version))
+        self.write(Cm.minimum_required(self.cmake_version))
         self.write()
 
         if self.project_name:
             self.write(
-                cmake_project(
+                Cm.project(
                     self.project_name,
                     version=self.project_version,
                     description=self.project_description,
@@ -314,7 +304,7 @@ class CMakeListsGenerator(BaseGenerator):
             self.write("# Dependencies")
             for dep in self.find_packages:
                 self.write(
-                    cmake_find_package(
+                    Cm.find_package(
                         dep["package"],
                         version=dep["version"],
                         required=dep["required"],
@@ -348,35 +338,35 @@ class CMakeListsGenerator(BaseGenerator):
             self.write("# Libraries")
             for name, config in self.libraries.items():
                 self.write(
-                    cmake_add_library(
+                    Cm.add_library(
                         name, *config["sources"], lib_type=config["lib_type"]
                     )
                 )
 
                 if config["include_dirs"]:
                     self.write(
-                        cmake_target_include_directories(
+                        Cm.target_include_directories(
                             name, *config["include_dirs"], visibility="PUBLIC"
                         )
                     )
 
                 if config["link_libraries"]:
                     self.write(
-                        cmake_target_link_libraries(
+                        Cm.target_link_libraries(
                             name, *config["link_libraries"], visibility="PUBLIC"
                         )
                     )
 
                 if config["compile_definitions"]:
                     self.write(
-                        cmake_target_compile_definitions(
+                        Cm.target_compile_definitions(
                             name, *config["compile_definitions"], visibility="PUBLIC"
                         )
                     )
 
                 if config["compile_options"]:
                     self.write(
-                        cmake_target_compile_options(
+                        Cm.target_compile_options(
                             name, *config["compile_options"], visibility="PRIVATE"
                         )
                     )
@@ -388,32 +378,32 @@ class CMakeListsGenerator(BaseGenerator):
         if self.executables:
             self.write("# Executables")
             for name, config in self.executables.items():
-                self.write(cmake_add_executable(name, *config["sources"]))
+                self.write(Cm.add_executable(name, *config["sources"]))
 
                 if config["include_dirs"]:
                     self.write(
-                        cmake_target_include_directories(
+                        Cm.target_include_directories(
                             name, *config["include_dirs"], visibility="PRIVATE"
                         )
                     )
 
                 if config["link_libraries"]:
                     self.write(
-                        cmake_target_link_libraries(
+                        Cm.target_link_libraries(
                             name, *config["link_libraries"], visibility="PRIVATE"
                         )
                     )
 
                 if config["compile_definitions"]:
                     self.write(
-                        cmake_target_compile_definitions(
+                        Cm.target_compile_definitions(
                             name, *config["compile_definitions"], visibility="PRIVATE"
                         )
                     )
 
                 if config["compile_options"]:
                     self.write(
-                        cmake_target_compile_options(
+                        Cm.target_compile_options(
                             name, *config["compile_options"], visibility="PRIVATE"
                         )
                     )

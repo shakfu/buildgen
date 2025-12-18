@@ -16,20 +16,7 @@ from buildgen.cmake.variables import (
 )
 from buildgen.cmake.generator import CMakeListsGenerator
 from buildgen.cmake.builder import CMakeBuilder
-from buildgen.cmake.functions import (
-    cmake_minimum_required,
-    cmake_project,
-    cmake_add_executable,
-    cmake_add_library,
-    cmake_target_link_libraries,
-    cmake_target_include_directories,
-    cmake_find_package,
-    cmake_if,
-    cmake_foreach,
-    cmake_message,
-    cmake_genex_target_file,
-    cmake_genex_config,
-)
+from buildgen.cmake.functions import Cm
 
 
 class TestCMakeVariables:
@@ -126,24 +113,24 @@ class TestCMakeFunctions:
     """Test CMake function helpers."""
 
     def test_cmake_minimum_required(self):
-        """Test cmake_minimum_required."""
-        result = cmake_minimum_required("3.16")
+        """Test Cm.minimum_required."""
+        result = Cm.minimum_required("3.16")
         assert "cmake_minimum_required(VERSION 3.16" in result
         assert "FATAL_ERROR" in result
 
     def test_cmake_minimum_required_no_fatal(self):
-        """Test cmake_minimum_required without FATAL_ERROR."""
-        result = cmake_minimum_required("3.16", fatal_error=False)
+        """Test Cm.minimum_required without FATAL_ERROR."""
+        result = Cm.minimum_required("3.16", fatal_error=False)
         assert "FATAL_ERROR" not in result
 
     def test_cmake_project_simple(self):
-        """Test simple cmake_project."""
-        result = cmake_project("MyProject")
+        """Test simple Cm.project."""
+        result = Cm.project("MyProject")
         assert "project(MyProject)" in result
 
     def test_cmake_project_full(self):
-        """Test cmake_project with all options."""
-        result = cmake_project(
+        """Test Cm.project with all options."""
+        result = Cm.project(
             "MyProject",
             version="1.0.0",
             description="My description",
@@ -155,85 +142,85 @@ class TestCMakeFunctions:
         assert "LANGUAGES C CXX" in result
 
     def test_cmake_add_executable(self):
-        """Test cmake_add_executable."""
-        result = cmake_add_executable("myapp", "main.cpp", "util.cpp")
+        """Test Cm.add_executable."""
+        result = Cm.add_executable("myapp", "main.cpp", "util.cpp")
         assert "add_executable(myapp main.cpp util.cpp)" in result
 
     def test_cmake_add_executable_win32(self):
-        """Test cmake_add_executable with WIN32."""
-        result = cmake_add_executable("myapp", "main.cpp", win32=True)
+        """Test Cm.add_executable with WIN32."""
+        result = Cm.add_executable("myapp", "main.cpp", win32=True)
         assert "WIN32" in result
 
     def test_cmake_add_library_static(self):
-        """Test cmake_add_library for static library."""
-        result = cmake_add_library("mylib", "lib.cpp", lib_type="STATIC")
+        """Test Cm.add_library for static library."""
+        result = Cm.add_library("mylib", "lib.cpp", lib_type="STATIC")
         assert "add_library(mylib STATIC lib.cpp)" in result
 
     def test_cmake_add_library_shared(self):
-        """Test cmake_add_library for shared library."""
-        result = cmake_add_library("mylib", "lib.cpp", lib_type="SHARED")
+        """Test Cm.add_library for shared library."""
+        result = Cm.add_library("mylib", "lib.cpp", lib_type="SHARED")
         assert "SHARED" in result
 
     def test_cmake_target_link_libraries(self):
-        """Test cmake_target_link_libraries."""
-        result = cmake_target_link_libraries("myapp", "pthread", "ssl")
+        """Test Cm.target_link_libraries."""
+        result = Cm.target_link_libraries("myapp", "pthread", "ssl")
         assert "target_link_libraries(myapp PUBLIC pthread ssl)" in result
 
     def test_cmake_target_link_libraries_private(self):
-        """Test cmake_target_link_libraries with PRIVATE."""
-        result = cmake_target_link_libraries("myapp", "pthread", visibility="PRIVATE")
+        """Test Cm.target_link_libraries with PRIVATE."""
+        result = Cm.target_link_libraries("myapp", "pthread", visibility="PRIVATE")
         assert "PRIVATE" in result
 
     def test_cmake_target_include_directories(self):
-        """Test cmake_target_include_directories."""
-        result = cmake_target_include_directories("myapp", "/usr/include", "src")
+        """Test Cm.target_include_directories."""
+        result = Cm.target_include_directories("myapp", "/usr/include", "src")
         assert "target_include_directories(" in result
         assert "/usr/include" in result
         assert "src" in result
 
     def test_cmake_find_package_simple(self):
-        """Test simple cmake_find_package."""
-        result = cmake_find_package("OpenSSL")
+        """Test simple Cm.find_package."""
+        result = Cm.find_package("OpenSSL")
         assert "find_package(OpenSSL" in result
         assert "REQUIRED" in result
 
     def test_cmake_find_package_with_version(self):
-        """Test cmake_find_package with version."""
-        result = cmake_find_package("Boost", version="1.70")
+        """Test Cm.find_package with version."""
+        result = Cm.find_package("Boost", version="1.70")
         assert "1.70" in result
 
     def test_cmake_find_package_with_components(self):
-        """Test cmake_find_package with components."""
-        result = cmake_find_package("Qt5", components=["Core", "Widgets"])
+        """Test Cm.find_package with components."""
+        result = Cm.find_package("Qt5", components=["Core", "Widgets"])
         assert "COMPONENTS Core Widgets" in result
 
     def test_cmake_if(self):
-        """Test cmake_if."""
-        result = cmake_if("WIN32", "set(OS Windows)")
+        """Test Cm.if_."""
+        result = Cm.if_("WIN32", "set(OS Windows)")
         assert "if(WIN32)" in result
         assert "set(OS Windows)" in result
         assert "endif()" in result
 
     def test_cmake_if_else(self):
-        """Test cmake_if with else."""
-        result = cmake_if("WIN32", "set(OS Windows)", "set(OS Unix)")
+        """Test Cm.if_ with else."""
+        result = Cm.if_("WIN32", "set(OS Windows)", "set(OS Unix)")
         assert "else()" in result
         assert "set(OS Unix)" in result
 
     def test_cmake_foreach(self):
-        """Test cmake_foreach."""
-        result = cmake_foreach("item", "${MY_LIST}", "message(${item})")
+        """Test Cm.foreach."""
+        result = Cm.foreach("item", "${MY_LIST}", "message(${item})")
         assert "foreach(item ${MY_LIST})" in result
         assert "endforeach()" in result
 
     def test_cmake_message(self):
-        """Test cmake_message."""
-        result = cmake_message("Hello World")
+        """Test Cm.message."""
+        result = Cm.message("Hello World")
         assert 'message(STATUS "Hello World")' in result
 
     def test_cmake_message_warning(self):
-        """Test cmake_message with WARNING."""
-        result = cmake_message("Warning!", mode="WARNING")
+        """Test Cm.message with WARNING."""
+        result = Cm.message("Warning!", mode="WARNING")
         assert "WARNING" in result
 
 
@@ -241,13 +228,13 @@ class TestCMakeGeneratorExpressions:
     """Test CMake generator expression helpers."""
 
     def test_genex_target_file(self):
-        """Test cmake_genex_target_file."""
-        result = cmake_genex_target_file("mylib")
+        """Test Cm.genex_target_file."""
+        result = Cm.genex_target_file("mylib")
         assert result == "$<TARGET_FILE:mylib>"
 
     def test_genex_config(self):
-        """Test cmake_genex_config."""
-        result = cmake_genex_config("Debug", "-DDEBUG")
+        """Test Cm.genex_config."""
+        result = Cm.genex_config("Debug", "-DDEBUG")
         assert "$<CONFIG:Debug>" in result
         assert "-DDEBUG" in result
 

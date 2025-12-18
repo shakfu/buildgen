@@ -62,6 +62,22 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 
+- Refactored Makefile functions to `Mk` namespace class
+  - `makefile_wildcard(...)` -> `Mk.wildcard(...)`
+  - `makefile_patsubst(...)` -> `Mk.patsubst(...)`
+  - All 30+ functions now accessed via `Mk.*`
+  - Import: `from buildgen.makefile.functions import Mk`
+
+- Refactored CMake functions to `Cm` namespace class
+  - `cmake_minimum_required(...)` -> `Cm.minimum_required(...)`
+  - `cmake_project(...)` -> `Cm.project(...)`
+  - All 40+ functions now accessed via `Cm.*`
+  - Import: `from buildgen.cmake.functions import Cm`
+
+- Removed backward compatibility aliases for old function names
+
+- Minimized package `__init__.py` exports for API flexibility
+
 - Package restructured from single file to multi-module
 - `MakefileGenerator` now inherits from `BaseGenerator`
 - Unified CLI entry point (`buildgen`)
@@ -86,9 +102,9 @@ All notable changes to this project will be documented in this file.
   - `Builder` class for direct compilation
 
 - **Makefile Functions**: Python helpers for Makefile functions
-  - `makefile_wildcard()`, `makefile_patsubst()`, `makefile_subst()`
-  - `makefile_if()`, `makefile_foreach()`, `makefile_shell()`
-  - And 20+ more
+  - `Mk.wildcard()`, `Mk.patsubst()`, `Mk.subst()`
+  - `Mk.if_()`, `Mk.foreach()`, `Mk.shell()`
+  - And 20+ more via `Mk.*` namespace
 
 - **Utilities**
   - `UniqueList` - Ordered set-like list

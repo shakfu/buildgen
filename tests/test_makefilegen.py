@@ -11,11 +11,7 @@ from buildgen.makefile.functions import (
     AUTOMATIC_VARIABLES,
     auto_var,
     get_auto_var_help,
-    makefile_filter,
-    makefile_patsubst,
-    makefile_sort,
-    makefile_subst,
-    makefile_wildcard,
+    Mk,
 )
 from buildgen.makefile.generator import MakefileWriter
 from buildgen.makefile.variables import AVar, CVar, IVar, SVar, Var
@@ -451,30 +447,30 @@ class TestMakefileFunctions:
 
     def test_makefile_wildcard(self):
         """Test wildcard function generation"""
-        result = makefile_wildcard("*.c", "*.cpp")
+        result = Mk.wildcard("*.c", "*.cpp")
         assert result == "$(wildcard *.c *.cpp)"
 
-        result = makefile_wildcard("src/*.c")
+        result = Mk.wildcard("src/*.c")
         assert result == "$(wildcard src/*.c)"
 
     def test_makefile_patsubst(self):
         """Test patsubst function generation"""
-        result = makefile_patsubst("%.c", "%.o", "$(SOURCES)")
+        result = Mk.patsubst("%.c", "%.o", "$(SOURCES)")
         assert result == "$(patsubst %.c,%.o,$(SOURCES))"
 
     def test_makefile_subst(self):
         """Test subst function generation"""
-        result = makefile_subst(".c", ".o", "main.c util.c")
+        result = Mk.subst(".c", ".o", "main.c util.c")
         assert result == "$(subst .c,.o,main.c util.c)"
 
     def test_makefile_filter(self):
         """Test filter function generation"""
-        result = makefile_filter("%.c", "$(FILES)")
+        result = Mk.filter("%.c", "$(FILES)")
         assert result == "$(filter %.c,$(FILES))"
 
     def test_makefile_sort(self):
         """Test sort function generation"""
-        result = makefile_sort("$(FILES)")
+        result = Mk.sort("$(FILES)")
         assert result == "$(sort $(FILES))"
 
 
@@ -636,10 +632,8 @@ class TestNewFeaturesIntegration:
 
         # Add variables
         generator.add_variable("PROJECT", "myapp")
-        generator.add_variable("SOURCES", makefile_wildcard("src/*.cpp"))
-        generator.add_variable(
-            "OBJECTS", makefile_patsubst("%.cpp", "%.o", "$(SOURCES)")
-        )
+        generator.add_variable("SOURCES", Mk.wildcard("src/*.cpp"))
+        generator.add_variable("OBJECTS", Mk.patsubst("%.cpp", "%.o", "$(SOURCES)"))
 
         # Add include directives
         generator.add_include("config.mk")
