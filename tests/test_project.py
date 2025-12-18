@@ -163,9 +163,7 @@ class TestProjectConfig:
 
     def test_from_json(self):
         """Test loading ProjectConfig from JSON file."""
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".json", delete=False
-        ) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
             json.dump(
                 {
                     "name": "testproject",
@@ -191,9 +189,7 @@ class TestProjectConfig:
             cxx_standard=17,
         )
 
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".json", delete=False
-        ) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
             config.to_json(f.name)
 
             with open(f.name) as rf:
@@ -207,9 +203,7 @@ class TestProjectConfig:
 
     def test_load_json_by_extension(self):
         """Test ProjectConfig.load() detects JSON by extension."""
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".json", delete=False
-        ) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
             json.dump({"name": "testproject"}, f)
             f.flush()
 
@@ -255,9 +249,7 @@ class TestProjectConfigGeneration:
             ],
         )
 
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix="", delete=False
-        ) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix="", delete=False) as f:
             config.generate_makefile(f.name)
 
             with open(f.name) as rf:
@@ -284,9 +276,7 @@ class TestProjectConfigGeneration:
             ],
         )
 
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".txt", delete=False
-        ) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as f:
             config.generate_cmake(f.name)
 
             with open(f.name) as rf:
@@ -443,12 +433,9 @@ class TestProjectConfigYAML:
     @pytest.fixture
     def yaml_available(self):
         """Check if pyyaml is available."""
-        try:
-            import yaml
+        import importlib.util
 
-            return True
-        except ImportError:
-            return False
+        return importlib.util.find_spec("yaml") is not None
 
     def test_from_yaml(self, yaml_available):
         """Test loading ProjectConfig from YAML file."""
@@ -457,9 +444,7 @@ class TestProjectConfigYAML:
 
         import yaml
 
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".yaml", delete=False
-        ) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             yaml.dump(
                 {
                     "name": "testproject",
@@ -490,9 +475,7 @@ class TestProjectConfigYAML:
             cxx_standard=17,
         )
 
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".yaml", delete=False
-        ) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             config.to_yaml(f.name)
 
             with open(f.name) as rf:
@@ -511,9 +494,7 @@ class TestProjectConfigYAML:
 
         import yaml
 
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".yaml", delete=False
-        ) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             yaml.dump({"name": "testproject"}, f)
             f.flush()
 

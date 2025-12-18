@@ -14,7 +14,7 @@ from buildgen.cmake.variables import (
     cmake_env_var,
     cmake_bool,
 )
-from buildgen.cmake.generator import CMakeListsGenerator, CMakeWriter
+from buildgen.cmake.generator import CMakeListsGenerator
 from buildgen.cmake.builder import CMakeBuilder
 from buildgen.cmake.functions import (
     cmake_minimum_required,
@@ -106,7 +106,7 @@ class TestCMakeVariables:
     def test_cmake_env_var_set(self):
         """Test CMakeEnvVar.set()."""
         env = CMakeEnvVar("MY_VAR")
-        assert 'set(ENV{MY_VAR}' in env.set("value")
+        assert "set(ENV{MY_VAR}" in env.set("value")
 
     def test_cmake_var_reference(self):
         """Test cmake_var function."""
@@ -337,9 +337,7 @@ class TestCMakeListsGenerator:
         gen = CMakeListsGenerator(temp_cmake)
         gen.set_project("TestProject")
         gen.add_find_package("Threads", required=True)
-        gen.add_executable(
-            "myapp", ["main.cpp"], link_libraries=["Threads::Threads"]
-        )
+        gen.add_executable("myapp", ["main.cpp"], link_libraries=["Threads::Threads"])
         gen.generate()
 
         with open(temp_cmake, "r") as f:

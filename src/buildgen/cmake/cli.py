@@ -1,7 +1,5 @@
 """CLI commands for CMake generation and building."""
 
-import argparse
-
 from buildgen.cmake.generator import CMakeListsGenerator
 from buildgen.cmake.builder import CMakeBuilder
 
@@ -147,9 +145,7 @@ def cmd_clean(args) -> None:
 
 def add_generate_parser(subparsers) -> None:
     """Add generate subparser for CMakeLists.txt generation."""
-    parser = subparsers.add_parser(
-        "generate", help="Generate CMakeLists.txt"
-    )
+    parser = subparsers.add_parser("generate", help="Generate CMakeLists.txt")
     p = parser.add_argument
 
     p("-o", "--output", default="CMakeLists.txt", help="Output file path")
@@ -163,8 +159,18 @@ def add_generate_parser(subparsers) -> None:
     p("--options", nargs="*", help="Options (NAME:docstring:ON/OFF format)")
     p("-f", "--find-packages", nargs="*", help="Packages to find (name:version format)")
 
-    p("-e", "--executables", nargs="*", help="Executables (name:source1 source2 format)")
-    p("-l", "--libraries", nargs="*", help="Libraries (name:TYPE:source1 source2 format)")
+    p(
+        "-e",
+        "--executables",
+        nargs="*",
+        help="Executables (name:source1 source2 format)",
+    )
+    p(
+        "-l",
+        "--libraries",
+        nargs="*",
+        help="Libraries (name:TYPE:source1 source2 format)",
+    )
 
     p("-I", "--include-dirs", nargs="*", help="Include directories")
     p("--cxxflags", nargs="*", help="C++ compiler flags")
@@ -177,9 +183,7 @@ def add_generate_parser(subparsers) -> None:
 
 def add_build_parser(subparsers) -> None:
     """Add build subparser for CMake build operations."""
-    parser = subparsers.add_parser(
-        "build", help="Configure and build with CMake"
-    )
+    parser = subparsers.add_parser("build", help="Configure and build with CMake")
     p = parser.add_argument
 
     p("-S", "--source-dir", default=".", help="Source directory")
@@ -206,9 +210,7 @@ def add_build_parser(subparsers) -> None:
 
 def add_clean_parser(subparsers) -> None:
     """Add clean subparser."""
-    parser = subparsers.add_parser(
-        "clean", help="Clean CMake build directory"
-    )
+    parser = subparsers.add_parser("clean", help="Clean CMake build directory")
     parser.add_argument(
         "-B", "--build-dir", default="build", help="Build directory to clean"
     )

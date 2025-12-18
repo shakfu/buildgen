@@ -2,10 +2,9 @@
 
 import os
 import shutil
-import subprocess
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Optional, Union
+from typing import Optional
 
 from buildgen.common.utils import UniqueList, PathLike
 
@@ -38,8 +37,9 @@ class BaseGenerator(ABC):
         pass
 
     @abstractmethod
-    def add_target(self, name: str, recipe: Optional[str] = None,
-                   deps: Optional[list[str]] = None) -> None:
+    def add_target(
+        self, name: str, recipe: Optional[str] = None, deps: Optional[list[str]] = None
+    ) -> None:
         """Add a build target."""
         pass
 

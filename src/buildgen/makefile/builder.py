@@ -1,10 +1,9 @@
 """Direct compilation builder for Makefile-style builds."""
 
 import os
-from pathlib import Path
 from typing import Optional
 
-from buildgen.common.utils import UniqueList, PathLike, TestFunc, always_true
+from buildgen.common.utils import PathLike, TestFunc, always_true
 from buildgen.common.base import BaseBuilder
 
 

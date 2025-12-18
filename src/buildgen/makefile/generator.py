@@ -61,8 +61,10 @@ class MakefileGenerator(BaseGenerator):
             if key in defaults:
                 return True
             assert key in self.vars, f"Invalid variable: {key}"
-            assert os.path.isdir(self.vars[key]), (
-                f"Value of variable {key} is not a directory: {self.vars[key]}"
+            var = self.vars[key]
+            var_value = var.value if isinstance(var, Var) else str(var)
+            assert os.path.isdir(var_value), (
+                f"Value of variable {key} is not a directory: {var_value}"
             )
             return True
         return os.path.isdir(str_path)

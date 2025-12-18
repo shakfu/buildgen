@@ -1,7 +1,5 @@
 """CLI commands for Makefile generation and building."""
 
-import argparse
-
 from buildgen.makefile.builder import Builder
 from buildgen.makefile.generator import MakefileGenerator
 
@@ -143,7 +141,9 @@ def cmd_makefile(args) -> None:
 
 def add_build_parser(subparsers) -> None:
     """Add build subparser for direct compilation."""
-    build_parser = subparsers.add_parser("build", help="Direct compilation using Builder")
+    build_parser = subparsers.add_parser(
+        "build", help="Direct compilation using Builder"
+    )
     bp = build_parser.add_argument
     bp("target", help="Output target name")
     bp("-c", "--cppfiles", nargs="*", help="C++ source files")

@@ -1,11 +1,10 @@
 """CMakeLists.txt generator class."""
 
-import os
 from typing import Optional
 
 from buildgen.common.utils import UniqueList, PathLike
 from buildgen.common.base import BaseGenerator
-from buildgen.cmake.variables import CMakeVar, CMakeCacheVar, CMakeOption, cmake_var
+from buildgen.cmake.variables import CMakeVar, CMakeCacheVar, CMakeOption
 from buildgen.cmake.functions import (
     cmake_minimum_required,
     cmake_project,
@@ -16,7 +15,6 @@ from buildgen.cmake.functions import (
     cmake_target_compile_definitions,
     cmake_target_compile_options,
     cmake_find_package,
-    cmake_message,
 )
 
 
@@ -349,9 +347,10 @@ class CMakeListsGenerator(BaseGenerator):
         if self.libraries:
             self.write("# Libraries")
             for name, config in self.libraries.items():
-                sources = " ".join(config["sources"])
                 self.write(
-                    cmake_add_library(name, *config["sources"], lib_type=config["lib_type"])
+                    cmake_add_library(
+                        name, *config["sources"], lib_type=config["lib_type"]
+                    )
                 )
 
                 if config["include_dirs"]:

@@ -14,8 +14,6 @@ from buildgen.common.project import ProjectConfig, TargetConfig, DependencyConfi
 from buildgen.makefile.variables import Var, SVar, IVar, CVar, AVar
 from buildgen.makefile.generator import MakefileGenerator, MakefileWriter
 from buildgen.makefile.builder import Builder as MakefileBuilder
-# Alias for backward compatibility
-Builder = MakefileBuilder
 from buildgen.makefile.functions import (
     AUTOMATIC_VARIABLES,
     auto_var,
@@ -64,6 +62,9 @@ from buildgen.cmake.variables import (
 )
 from buildgen.cmake.generator import CMakeListsGenerator
 from buildgen.cmake.builder import CMakeBuilder
+
+# Alias for backward compatibility
+Builder = MakefileBuilder
 
 __all__ = [
     # Version

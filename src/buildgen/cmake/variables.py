@@ -1,7 +1,5 @@
 """CMake variable classes for different variable types."""
 
-from typing import Optional, Union
-
 
 class CMakeVar:
     """Normal CMake variable set with set() command."""

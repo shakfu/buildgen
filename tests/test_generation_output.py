@@ -71,7 +71,9 @@ class TestMakefileGeneration:
         gen.add_cxxflags("-Wall", "-fPIC")
         gen.add_include_dirs(str(test_dir / "include"))
 
-        gen.add_target("libmylib.a", "$(AR) $(ARFLAGS) $@ $^", deps=["src/lib.o", "src/utils.o"])
+        gen.add_target(
+            "libmylib.a", "$(AR) $(ARFLAGS) $@ $^", deps=["src/lib.o", "src/utils.o"]
+        )
         gen.add_pattern_rule("%.o", "%.cpp", "$(CXX) $(CXXFLAGS) -c $< -o $@")
         gen.add_phony("all", "clean")
         gen.add_target("all", deps=["libmylib.a"])
@@ -100,7 +102,7 @@ class TestMakefileGeneration:
         gen.add_target(
             "libmylib.so",
             "$(CXX) -shared -o $@ $^ $(LDFLAGS)",
-            deps=["src/lib.o", "src/utils.o"]
+            deps=["src/lib.o", "src/utils.o"],
         )
         gen.add_pattern_rule("%.o", "%.cpp", "$(CXX) $(CXXFLAGS) -c $< -o $@")
         gen.add_phony("all", "clean")
@@ -134,14 +136,14 @@ class TestMakefileGeneration:
         gen.add_target(
             "myapp",
             "$(CXX) $(CXXFLAGS) -o $@ $^ -L. -lcore",
-            deps=["src/main.o", "libcore.a"]
+            deps=["src/main.o", "libcore.a"],
         )
 
         # Test executable
         gen.add_target(
             "test_runner",
             "$(CXX) $(CXXFLAGS) -o $@ $^ -L. -lcore",
-            deps=["tests/test_main.o", "libcore.a"]
+            deps=["tests/test_main.o", "libcore.a"],
         )
 
         gen.add_pattern_rule("%.o", "%.cpp", "$(CXX) $(CXXFLAGS) -c $< -o $@")
@@ -168,7 +170,7 @@ class TestMakefileGeneration:
             "ifeq",
             "$(DEBUG),1",
             "CXXFLAGS += -g -O0 -DDEBUG",
-            "CXXFLAGS += -O2 -DNDEBUG"
+            "CXXFLAGS += -O2 -DNDEBUG",
         )
         gen.add_target("myapp", "$(CXX) $(CXXFLAGS) -o $@ $^", deps=["main.o"])
         gen.add_phony("all")
@@ -282,7 +284,9 @@ class TestCMakeGeneration:
         gen.set_cxx_standard(17)
         gen.add_find_package("Threads", required=True)
         gen.add_find_package("OpenSSL", version="1.1", required=True)
-        gen.add_find_package("Boost", version="1.70", components=["filesystem", "system"])
+        gen.add_find_package(
+            "Boost", version="1.70", components=["filesystem", "system"]
+        )
         gen.add_executable(
             "myapp",
             ["src/main.cpp"],
@@ -384,7 +388,7 @@ class TestCMakeGeneration:
         gen.add_executable(
             "myapp",
             ["src/main.cpp"],
-            compile_definitions=["DEBUG", "VERSION=\\\"1.0.0\\\""],
+            compile_definitions=["DEBUG", 'VERSION=\\"1.0.0\\"'],
             compile_options=["-fno-rtti"],
         )
         gen.generate()
@@ -663,6 +667,228 @@ class TestProjectConfigGeneration:
         assert "project(fullproject" in cmake
         assert "find_package(Threads REQUIRED)" in cmake
         assert "find_package(OpenSSL REQUIRED)" in cmake
+
+
+class TestCMakeFrontendGeneration:
+    """Test CMake with Makefile frontend generation."""
+
+    def test_simple_cmake_frontend(self):
+        """Generate CMakeLists.txt with Makefile frontend for simple project."""
+        test_dir = get_test_dir("cmake-frontend-simple")
+
+        config = ProjectConfig(
+            name="myapp",
+            version="1.0.0",
+            cxx_standard=17,
+            compile_options=["-Wall"],
+            targets=[
+                TargetConfig(
+                    name="myapp",
+                    target_type="executable",
+                    sources=["src/main.cpp"],
+                ),
+            ],
+        )
+
+        config.generate_cmake_with_frontend(
+            makefile_path=test_dir / "Makefile",
+            cmake_path=test_dir / "CMakeLists.txt",
+        )
+
+        assert (test_dir / "Makefile").exists()
+        assert (test_dir / "CMakeLists.txt").exists()
+
+        makefile = (test_dir / "Makefile").read_text()
+        cmake = (test_dir / "CMakeLists.txt").read_text()
+
+        # Makefile should wrap cmake commands
+        assert "CMAKE ?= cmake" in makefile
+        assert "BUILD_DIR ?= build" in makefile
+        assert "$(CMAKE) -S . -B $(BUILD_DIR)" in makefile
+        assert "$(CMAKE) --build $(BUILD_DIR)" in makefile
+        assert ".PHONY:" in makefile
+
+        # CMakeLists.txt should have actual build logic
+        assert "add_executable(myapp" in cmake
+
+    def test_cmake_frontend_with_install(self):
+        """Generate CMake frontend with install target."""
+        test_dir = get_test_dir("cmake-frontend-with-install")
+
+        config = ProjectConfig(
+            name="myapp",
+            version="1.0.0",
+            cxx_standard=17,
+            targets=[
+                TargetConfig(
+                    name="myapp",
+                    target_type="executable",
+                    sources=["src/main.cpp"],
+                    install=True,
+                ),
+            ],
+        )
+
+        config.generate_cmake_with_frontend(
+            makefile_path=test_dir / "Makefile",
+            cmake_path=test_dir / "CMakeLists.txt",
+        )
+
+        makefile = (test_dir / "Makefile").read_text()
+        cmake = (test_dir / "CMakeLists.txt").read_text()
+
+        # Should have install target in Makefile
+        assert "install: build" in makefile
+        assert "$(CMAKE) --install $(BUILD_DIR)" in makefile
+
+        # Should have install in CMakeLists.txt
+        assert "install(TARGETS myapp" in cmake
+
+    def test_cmake_frontend_multi_target(self):
+        """Generate CMake frontend with multiple executable targets."""
+        test_dir = get_test_dir("cmake-frontend-multi-target")
+
+        config = ProjectConfig(
+            name="myproject",
+            version="1.0.0",
+            cxx_standard=17,
+            targets=[
+                TargetConfig(
+                    name="core",
+                    target_type="static",
+                    sources=["src/core.cpp"],
+                    include_dirs=["include"],
+                ),
+                TargetConfig(
+                    name="myapp",
+                    target_type="executable",
+                    sources=["src/main.cpp"],
+                    link_libraries=["core"],
+                    install=True,
+                ),
+                TargetConfig(
+                    name="myapp_tests",
+                    target_type="executable",
+                    sources=["tests/test_main.cpp"],
+                    link_libraries=["core"],
+                ),
+            ],
+        )
+
+        config.generate_cmake_with_frontend(
+            makefile_path=test_dir / "Makefile",
+            cmake_path=test_dir / "CMakeLists.txt",
+        )
+
+        makefile = (test_dir / "Makefile").read_text()
+
+        # Should have targets for each executable
+        assert "myapp: configure" in makefile
+        assert "myapp_tests: configure" in makefile
+        assert "--target myapp" in makefile
+        assert "--target myapp_tests" in makefile
+
+    def test_cmake_frontend_custom_build_dir(self):
+        """Generate CMake frontend with custom build directory."""
+        test_dir = get_test_dir("cmake-frontend-custom-builddir")
+
+        config = ProjectConfig(
+            name="myapp",
+            version="1.0.0",
+            cxx_standard=17,
+            targets=[
+                TargetConfig(
+                    name="myapp",
+                    target_type="executable",
+                    sources=["src/main.cpp"],
+                ),
+            ],
+        )
+
+        config.generate_cmake_with_frontend(
+            makefile_path=test_dir / "Makefile",
+            cmake_path=test_dir / "CMakeLists.txt",
+            build_dir="cmake-build",
+            build_type="Debug",
+        )
+
+        makefile = (test_dir / "Makefile").read_text()
+
+        assert "BUILD_DIR ?= cmake-build" in makefile
+        assert "BUILD_TYPE ?= Debug" in makefile
+
+    def test_cmake_frontend_full_project(self):
+        """Generate CMake frontend for full project with dependencies."""
+        test_dir = get_test_dir("cmake-frontend-full")
+
+        config = ProjectConfig(
+            name="fullproject",
+            version="1.0.0",
+            description="A full project with CMake frontend",
+            cxx_standard=17,
+            compile_options=["-Wall", "-Wextra"],
+            dependencies=[
+                DependencyConfig(name="Threads"),
+                DependencyConfig(
+                    name="fmt",
+                    git_repository="https://github.com/fmtlib/fmt.git",
+                    git_tag="10.1.1",
+                ),
+            ],
+            targets=[
+                TargetConfig(
+                    name="mylib",
+                    target_type="static",
+                    sources=["src/lib.cpp"],
+                    include_dirs=["include"],
+                    install=True,
+                ),
+                TargetConfig(
+                    name="myapp",
+                    target_type="executable",
+                    sources=["src/main.cpp"],
+                    link_libraries=["mylib", "Threads::Threads", "fmt::fmt"],
+                    install=True,
+                ),
+                TargetConfig(
+                    name="myapp_tests",
+                    target_type="executable",
+                    sources=["tests/test_main.cpp"],
+                    link_libraries=["mylib"],
+                ),
+            ],
+        )
+
+        config.generate_cmake_with_frontend(
+            makefile_path=test_dir / "Makefile",
+            cmake_path=test_dir / "CMakeLists.txt",
+        )
+
+        # Also save the config for reference
+        config.to_json(test_dir / "project.json")
+
+        makefile = (test_dir / "Makefile").read_text()
+        cmake = (test_dir / "CMakeLists.txt").read_text()
+
+        # Makefile should be a frontend
+        assert "# Makefile frontend for CMake build" in makefile
+        assert "$(CMAKE) -S . -B $(BUILD_DIR)" in makefile
+        assert "$(CMAKE) --build $(BUILD_DIR)" in makefile
+        assert "$(CMAKE) --install $(BUILD_DIR)" in makefile
+        assert "ctest --output-on-failure" in makefile
+        assert "myapp: configure" in makefile
+        assert "myapp_tests: configure" in makefile
+        assert "help:" in makefile
+
+        # CMakeLists.txt should have all the build logic
+        assert "project(fullproject" in cmake
+        assert "find_package(Threads REQUIRED)" in cmake
+        assert "FetchContent_Declare" in cmake
+        assert "fmt" in cmake
+        assert "add_library(mylib STATIC" in cmake
+        assert "add_executable(myapp" in cmake
+        assert "add_executable(myapp_tests" in cmake
+        assert "install(TARGETS" in cmake
 
 
 class TestBuildTypeTemplates:

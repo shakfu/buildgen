@@ -60,17 +60,8 @@ def cmd_project_init(args: argparse.Namespace) -> None:
     name = args.name or "myproject"
     build_type = args.type
 
-    # Base configuration
-    base_config = {
-        "name": name,
-        "version": "1.0.0",
-        "description": f"A {build_type} project",
-        "cxx_standard": 17,
-        "compile_options": ["-Wall", "-Wextra"],
-    }
-
-    targets = []
-    dependencies = []
+    targets: list[TargetConfig] = []
+    dependencies: list[DependencyConfig] = []
 
     if build_type == "executable":
         targets = [
@@ -180,7 +171,11 @@ def cmd_project_init(args: argparse.Namespace) -> None:
         ]
 
     sample = ProjectConfig(
-        **base_config,
+        name=name,
+        version="1.0.0",
+        description=f"A {build_type} project",
+        cxx_standard=17,
+        compile_options=["-Wall", "-Wextra"],
         targets=targets,
         dependencies=dependencies,
     )
@@ -210,7 +205,8 @@ def add_project_subparsers(subparsers: argparse._SubParsersAction) -> None:
         help="Generate Makefile and/or CMakeLists.txt from config",
     )
     gen_parser.add_argument(
-        "-c", "--config",
+        "-c",
+        "--config",
         required=True,
         help="Path to project configuration file (JSON or YAML)",
     )
@@ -256,16 +252,19 @@ def add_project_subparsers(subparsers: argparse._SubParsersAction) -> None:
         epilog="Use 'buildgen project types' to list available build types.",
     )
     init_parser.add_argument(
-        "-o", "--output",
+        "-o",
+        "--output",
         default="project.json",
         help="Output path for configuration file (default: project.json)",
     )
     init_parser.add_argument(
-        "-n", "--name",
+        "-n",
+        "--name",
         help="Project name (default: myproject)",
     )
     init_parser.add_argument(
-        "-t", "--type",
+        "-t",
+        "--type",
         choices=list(BUILD_TYPES.keys()),
         default="executable",
         help="Project type template (default: executable)",

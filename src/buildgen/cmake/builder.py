@@ -242,5 +242,6 @@ class CMakeBuilder(BaseBuilder):
         """Clean build directory."""
         if self.build_dir.exists():
             import shutil
+
             shutil.rmtree(self.build_dir)
             print(f"Removed: {self.build_dir}")

@@ -50,6 +50,7 @@ def get_auto_var_help(var: Optional[str] = None) -> str:
 
 # String/filename functions
 
+
 def makefile_wildcard(*patterns: str) -> str:
     """Generate a Makefile wildcard function call."""
     pattern_list = " ".join(patterns)
@@ -108,6 +109,7 @@ def makefile_lastword(text: str) -> str:
 
 # Filename functions
 
+
 def makefile_dir(names: str) -> str:
     """Generate a Makefile dir function call."""
     return f"$(dir {names})"
@@ -155,6 +157,7 @@ def makefile_abspath(names: str) -> str:
 
 # Conditional functions
 
+
 def makefile_if(condition: str, then_part: str, else_part: str = "") -> str:
     """Generate a Makefile if function call."""
     if else_part:
@@ -176,6 +179,7 @@ def makefile_and(*conditions: str) -> str:
 
 # Control functions
 
+
 def makefile_foreach(var: str, list_: str, text: str) -> str:
     """Generate a Makefile foreach function call."""
     return f"$(foreach {var},{list_},{text})"
@@ -196,6 +200,7 @@ def makefile_eval(text: str) -> str:
 
 # Variable functions
 
+
 def makefile_origin(variable: str) -> str:
     """Generate a Makefile origin function call."""
     return f"$(origin {variable})"
@@ -212,6 +217,7 @@ def makefile_value(variable: str) -> str:
 
 
 # Shell and misc functions
+
 
 def makefile_shell(command: str) -> str:
     """Generate a Makefile shell function call."""
