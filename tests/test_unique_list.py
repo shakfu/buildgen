@@ -1,5 +1,5 @@
 import pytest
-from makefilegen import UniqueList
+from buildgen import UniqueList
 
 
 class TestUniqueList:

@@ -1,10 +1,13 @@
 [project]
-name = "makefilegen"
-version = "0.1.0"
-description = "A Makefile generator or direct compilation tool."
+name = "buildgen"
+version = "0.2.0"
+description = "Build system generator - Makefile, CMake, and more."
 readme = "README.md"
-requires-python = ">=3.13"
+requires-python = ">=3.11"
 dependencies = []
+
+[project.scripts]
+buildgen = "buildgen.cli:main"
 
 [tool.pytest.ini_options]
 pythonpath = ["."]
@@ -15,3 +18,7 @@ dev = [
     "pytest>=8.4.2",
     "pytest-cov>=7.0.0",
 ]
+
+[build-system]
+requires = ["uv_build>=0.9.18,<0.10.0"]
+build-backend = "uv_build"

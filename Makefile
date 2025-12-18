@@ -8,11 +8,11 @@ test:
 
 coverage:
 	@echo "generating test coverage report"
-	@uv run pytest --cov-report=term-missing --cov=makefilegen tests
+	@uv run pytest --cov-report=term-missing --cov=buildgen tests
 
 coverage-html:
 	@echo "generating test coverage report"
-	@uv run pytest --cov-report=html:cov_html --cov-report=term-missing --cov=makefilegen tests
+	@uv run pytest --cov-report=html:cov_html --cov-report=term-missing --cov=buildgen tests
 
 clean:
 	@find . | grep -E "(__pycache__|\.pyc|\.pyo$/)" | xargs rm -rf

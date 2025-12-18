@@ -1,37 +1,75 @@
-# makefilegen
+# buildgen
 
-A Makefile generator or direct compilation tool, inspired by my work on `shedskin.makefile` in the [shedskin project](https://github.com/shedskin/shedskin), designed as a general-purpose utility that may be widely useful.
+A build system generator package supporting Makefile, CMake, and cross-generator project definitions.
 
+Originally inspired by work on `shedskin.makefile` in the [shedskin project](https://github.com/shedskin/shedskin).
 
-## TODO
+## Installation
 
-- [ ] Add argparse-based cli interface which can generate based on recipes
+```bash
+pip install buildgen
+```
 
-- [ ] Maybe use `unique_list` datastructure
+## Usage
 
-- [ ] Include a referance to auto variables
+### CLI
+
+```bash
+# Generate from project config (recommended)
+buildgen project init -t full -n myproject -o project.json
+buildgen project generate -c project.json --all
+
+# List available project templates
+buildgen project types
+
+# Direct Makefile generation
+buildgen makefile generate -o Makefile --targets "all:main.o:"
+
+# Direct CMake generation
+buildgen cmake generate -o CMakeLists.txt --project myapp --cxx-standard 17
+```
+
+### Python API
 
 ```python
-AUTOMATIC_VARIABLES = {
-    "$@": "The file name of the target of the rule.",
-    "$%": "The target member name, when the target is an archive member.",
-    "$<": "The name of the first prerequisite.",
-    "$?": "The names of all the prerequisites that are newer than the target, with spaces between them.",
-    "$^": "The names of all the prerequisites, with spaces between them.",
-    "$+": "This is like `$^`, but prerequisites listed more than once are duplicated in the order they were listed in the makefile.",
-    "$|": "The names of all the order-only prerequisites, with spaces between them.",
-    "$*": "The stem with which an implicit rule matches.",
-    "$(@D)": "The directory part of the file name of the target, with the trailing slash removed.",
-    "$(@F)": "The file-within-directory part of the file name of the target.",
-    "$(*D)": "The directory part of the stem.",
-    "$(*F)": "The file-within-directory part of the stem.",
-    "$(%D)": "The directory part of the target archive member name.",
-    "$(%F)": "The file-within-directory part of the target archive member name.",
-    "$(^D)": "Lists of the directory parts of all prerequisites.",
-    "$(^F)": "Lists of the file-within-directory parts of all prerequisites.",
-    "$(+D)": "Lists of the directory parts of all prerequisites, including multiple instances of duplicated prerequisites.",
-    "$(+F)": "Lists of the file-within-directory parts of all prerequisites, including multiple instances of duplicated prerequisites.",
-    "$(?D)": "Lists of the directory parts of all prerequisites that are newer than the target.",
-    "$(?F)": "Lists of the file-within-directory parts of all prerequisites that are newer than the target.",
+from buildgen import ProjectConfig, MakefileGenerator, CMakeListsGenerator
+
+# Cross-generator: define once, generate both
+config = ProjectConfig.load("project.json")
+config.generate_all()  # Creates Makefile and CMakeLists.txt
+
+# Or use generators directly
+gen = MakefileGenerator("Makefile")
+gen.add_include_dirs("include")
+gen.add_target("all", deps=["main.o"])
+gen.generate()
+```
+
+## Project Configuration
+
+Define a project in JSON or YAML:
+
+```json
+{
+    "name": "myproject",
+    "version": "1.0.0",
+    "cxx_standard": 17,
+    "compile_options": ["-Wall", "-Wextra"],
+    "targets": [
+        {"name": "myapp", "type": "executable", "sources": ["src/main.cpp"]}
+    ]
 }
 ```
+
+See `buildgen project types` for available templates.
+
+## Development
+
+```bash
+make test        # Run tests
+make coverage    # Coverage report
+```
+
+## License
+
+MIT

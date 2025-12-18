@@ -2,7 +2,7 @@ import pytest
 import tempfile
 import os
 from pathlib import Path
-from makefilegen import (
+from buildgen import (
     Var, SVar, IVar, CVar, AVar,
     Builder, MakefileGenerator, MakefileWriter,
     UniqueList, PythonSystem,
