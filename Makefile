@@ -1,5 +1,5 @@
 .PHONY: all test coverage coverage-html lint format format-check typecheck \
-		build check publish clean
+		build check publish publish-test clean
 
 all: test
 
@@ -44,6 +44,10 @@ check: build
 publish: check
 	@echo "publishing to PyPI"
 	@uv run twine upload dist/*
+
+publish-test: check
+	@echo "publishing to TestPyPI"
+	@uv run twine upload --repository testpypi dist/*
 
 clean:
 	@find . | grep -E "(__pycache__|\.pyc|\.pyo$$)" | xargs rm -rf
