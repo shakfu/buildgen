@@ -3,9 +3,6 @@
 All generated files are written to ./build/test-output/<test-name>/
 """
 
-import pytest
-from pathlib import Path
-
 from buildgen import (
     MakefileGenerator,
     CMakeListsGenerator,
@@ -14,30 +11,12 @@ from buildgen import (
 from buildgen.common.project import TargetConfig, DependencyConfig
 
 
-# Output directory for all generated files
-OUTPUT_DIR = Path(__file__).parent.parent / "build" / "test-output"
-
-
-@pytest.fixture(scope="module", autouse=True)
-def setup_output_dir():
-    """Create the output directory before tests run."""
-    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-    yield
-
-
-def get_test_dir(name: str) -> Path:
-    """Get or create a test-specific output directory."""
-    test_dir = OUTPUT_DIR / name
-    test_dir.mkdir(parents=True, exist_ok=True)
-    return test_dir
-
-
 class TestMakefileGeneration:
     """Test Makefile generation with file output."""
 
-    def test_simple_executable(self):
+    def test_simple_executable(self, test_output_dir):
         """Generate Makefile for a simple executable."""
-        test_dir = get_test_dir("makefile-simple-executable")
+        test_dir = test_output_dir("makefile-simple-executable")
         output = test_dir / "Makefile"
 
         gen = MakefileGenerator(output)
@@ -56,9 +35,9 @@ class TestMakefileGeneration:
         assert "-std=c++17" in content
         assert "myapp" in content
 
-    def test_static_library(self):
+    def test_static_library(self, test_output_dir):
         """Generate Makefile for a static library."""
-        test_dir = get_test_dir("makefile-static-library")
+        test_dir = test_output_dir("makefile-static-library")
         output = test_dir / "Makefile"
 
         # Create include dir for validation
@@ -86,9 +65,9 @@ class TestMakefileGeneration:
         assert "libmylib.a" in content
         assert "-fPIC" in content
 
-    def test_shared_library(self):
+    def test_shared_library(self, test_output_dir):
         """Generate Makefile for a shared library."""
-        test_dir = get_test_dir("makefile-shared-library")
+        test_dir = test_output_dir("makefile-shared-library")
         output = test_dir / "Makefile"
 
         # Create include dir for validation
@@ -115,9 +94,9 @@ class TestMakefileGeneration:
         assert "libmylib.so" in content
         assert "-shared" in content
 
-    def test_multi_target(self):
+    def test_multi_target(self, test_output_dir):
         """Generate Makefile with multiple targets."""
-        test_dir = get_test_dir("makefile-multi-target")
+        test_dir = test_output_dir("makefile-multi-target")
         output = test_dir / "Makefile"
 
         # Create directories for validation
@@ -159,9 +138,9 @@ class TestMakefileGeneration:
         assert "myapp" in content
         assert "test_runner" in content
 
-    def test_with_conditionals(self):
+    def test_with_conditionals(self, test_output_dir):
         """Generate Makefile with conditional blocks."""
-        test_dir = get_test_dir("makefile-conditionals")
+        test_dir = test_output_dir("makefile-conditionals")
         output = test_dir / "Makefile"
 
         gen = MakefileGenerator(output)
@@ -183,9 +162,9 @@ class TestMakefileGeneration:
         assert "-g -O0 -DDEBUG" in content
         assert "-O2 -DNDEBUG" in content
 
-    def test_with_includes(self):
+    def test_with_includes(self, test_output_dir):
         """Generate Makefile with include directives."""
-        test_dir = get_test_dir("makefile-includes")
+        test_dir = test_output_dir("makefile-includes")
         output = test_dir / "Makefile"
 
         # Create a config.mk file to include
@@ -208,9 +187,9 @@ class TestMakefileGeneration:
 class TestCMakeGeneration:
     """Test CMake generation with file output."""
 
-    def test_simple_executable(self):
+    def test_simple_executable(self, test_output_dir):
         """Generate CMakeLists.txt for a simple executable."""
-        test_dir = get_test_dir("cmake-simple-executable")
+        test_dir = test_output_dir("cmake-simple-executable")
         output = test_dir / "CMakeLists.txt"
 
         gen = CMakeListsGenerator(output)
@@ -227,9 +206,9 @@ class TestCMakeGeneration:
         assert "CMAKE_CXX_STANDARD 17" in content
         assert "add_executable(myapp" in content
 
-    def test_static_library(self):
+    def test_static_library(self, test_output_dir):
         """Generate CMakeLists.txt for a static library."""
-        test_dir = get_test_dir("cmake-static-library")
+        test_dir = test_output_dir("cmake-static-library")
         output = test_dir / "CMakeLists.txt"
 
         gen = CMakeListsGenerator(output)
@@ -250,9 +229,9 @@ class TestCMakeGeneration:
         assert "add_library(mylib STATIC" in content
         assert "install(TARGETS mylib" in content
 
-    def test_shared_library(self):
+    def test_shared_library(self, test_output_dir):
         """Generate CMakeLists.txt for a shared library."""
-        test_dir = get_test_dir("cmake-shared-library")
+        test_dir = test_output_dir("cmake-shared-library")
         output = test_dir / "CMakeLists.txt"
 
         gen = CMakeListsGenerator(output)
@@ -273,9 +252,9 @@ class TestCMakeGeneration:
         assert "add_library(mylib SHARED" in content
         assert "MYLIB_EXPORTS" in content
 
-    def test_with_find_package(self):
+    def test_with_find_package(self, test_output_dir):
         """Generate CMakeLists.txt with find_package dependencies."""
-        test_dir = get_test_dir("cmake-find-package")
+        test_dir = test_output_dir("cmake-find-package")
         output = test_dir / "CMakeLists.txt"
 
         gen = CMakeListsGenerator(output)
@@ -301,9 +280,9 @@ class TestCMakeGeneration:
         assert "find_package(Boost 1.70 COMPONENTS filesystem system" in content
         assert "target_link_libraries(myapp" in content
 
-    def test_with_fetchcontent(self):
+    def test_with_fetchcontent(self, test_output_dir):
         """Generate CMakeLists.txt with FetchContent dependencies."""
-        test_dir = get_test_dir("cmake-fetchcontent")
+        test_dir = test_output_dir("cmake-fetchcontent")
         output = test_dir / "CMakeLists.txt"
 
         gen = CMakeListsGenerator(output)
@@ -334,9 +313,9 @@ class TestCMakeGeneration:
         assert "nlohmann_json" in content
         assert "FetchContent_MakeAvailable" in content
 
-    def test_multi_target(self):
+    def test_multi_target(self, test_output_dir):
         """Generate CMakeLists.txt with multiple targets."""
-        test_dir = get_test_dir("cmake-multi-target")
+        test_dir = test_output_dir("cmake-multi-target")
         output = test_dir / "CMakeLists.txt"
 
         gen = CMakeListsGenerator(output)
@@ -375,9 +354,9 @@ class TestCMakeGeneration:
         assert "add_executable(myapp" in content
         assert "add_executable(myapp_tests" in content
 
-    def test_with_compile_options(self):
+    def test_with_compile_options(self, test_output_dir):
         """Generate CMakeLists.txt with compile options and definitions."""
-        test_dir = get_test_dir("cmake-compile-options")
+        test_dir = test_output_dir("cmake-compile-options")
         output = test_dir / "CMakeLists.txt"
 
         gen = CMakeListsGenerator(output)
@@ -403,9 +382,9 @@ class TestCMakeGeneration:
 class TestProjectConfigGeneration:
     """Test ProjectConfig cross-generator generation with file output."""
 
-    def test_simple_executable(self):
+    def test_simple_executable(self, test_output_dir):
         """Generate both Makefile and CMakeLists.txt for simple executable."""
-        test_dir = get_test_dir("project-simple-executable")
+        test_dir = test_output_dir("project-simple-executable")
 
         config = ProjectConfig(
             name="myapp",
@@ -437,9 +416,9 @@ class TestProjectConfigGeneration:
         assert "-std=c++17" in makefile
         assert "CMAKE_CXX_STANDARD 17" in cmake
 
-    def test_static_library(self):
+    def test_static_library(self, test_output_dir):
         """Generate both files for static library."""
-        test_dir = get_test_dir("project-static-library")
+        test_dir = test_output_dir("project-static-library")
 
         config = ProjectConfig(
             name="mylib",
@@ -468,9 +447,9 @@ class TestProjectConfigGeneration:
         assert "add_library(mylib STATIC" in cmake
         assert "install(TARGETS mylib" in cmake
 
-    def test_shared_library(self):
+    def test_shared_library(self, test_output_dir):
         """Generate both files for shared library."""
-        test_dir = get_test_dir("project-shared-library")
+        test_dir = test_output_dir("project-shared-library")
 
         config = ProjectConfig(
             name="mylib",
@@ -498,9 +477,9 @@ class TestProjectConfigGeneration:
         assert "-shared" in makefile
         assert "add_library(mylib SHARED" in cmake
 
-    def test_with_dependencies(self):
+    def test_with_dependencies(self, test_output_dir):
         """Generate both files with external dependencies."""
-        test_dir = get_test_dir("project-with-dependencies")
+        test_dir = test_output_dir("project-with-dependencies")
 
         config = ProjectConfig(
             name="myapp",
@@ -532,9 +511,9 @@ class TestProjectConfigGeneration:
         assert "find_package(Threads REQUIRED)" in cmake
         assert "find_package(OpenSSL REQUIRED)" in cmake
 
-    def test_with_fetchcontent(self):
+    def test_with_fetchcontent(self, test_output_dir):
         """Generate both files with FetchContent dependencies."""
-        test_dir = get_test_dir("project-with-fetchcontent")
+        test_dir = test_output_dir("project-with-fetchcontent")
 
         config = ProjectConfig(
             name="myapp",
@@ -568,9 +547,9 @@ class TestProjectConfigGeneration:
         assert "fmt" in cmake
         assert "https://github.com/fmtlib/fmt.git" in cmake
 
-    def test_multi_target_project(self):
+    def test_multi_target_project(self, test_output_dir):
         """Generate both files for multi-target project."""
-        test_dir = get_test_dir("project-multi-target")
+        test_dir = test_output_dir("project-multi-target")
 
         config = ProjectConfig(
             name="myproject",
@@ -619,13 +598,14 @@ class TestProjectConfigGeneration:
         assert "add_executable(myapp_tests" in cmake
         assert "install(TARGETS myapp" in cmake
 
-    def test_full_project_from_json(self):
+    def test_full_project_from_json(self, test_output_dir):
         """Generate from JSON config file."""
-        test_dir = get_test_dir("project-from-json")
+        test_dir = test_output_dir("project-from-json")
 
         # Write JSON config
         json_config = test_dir / "project.json"
-        json_config.write_text("""{
+        json_config.write_text(
+            """{
     "name": "fullproject",
     "version": "1.0.0",
     "description": "A full featured project",
@@ -651,7 +631,8 @@ class TestProjectConfigGeneration:
             "install": true
         }
     ]
-}""")
+}"""
+        )
 
         # Load and generate
         config = ProjectConfig.load(json_config)
@@ -672,9 +653,9 @@ class TestProjectConfigGeneration:
 class TestCMakeFrontendGeneration:
     """Test CMake with Makefile frontend generation."""
 
-    def test_simple_cmake_frontend(self):
+    def test_simple_cmake_frontend(self, test_output_dir):
         """Generate CMakeLists.txt with Makefile frontend for simple project."""
-        test_dir = get_test_dir("cmake-frontend-simple")
+        test_dir = test_output_dir("cmake-frontend-simple")
 
         config = ProjectConfig(
             name="myapp",
@@ -711,9 +692,9 @@ class TestCMakeFrontendGeneration:
         # CMakeLists.txt should have actual build logic
         assert "add_executable(myapp" in cmake
 
-    def test_cmake_frontend_with_install(self):
+    def test_cmake_frontend_with_install(self, test_output_dir):
         """Generate CMake frontend with install target."""
-        test_dir = get_test_dir("cmake-frontend-with-install")
+        test_dir = test_output_dir("cmake-frontend-with-install")
 
         config = ProjectConfig(
             name="myapp",
@@ -744,9 +725,9 @@ class TestCMakeFrontendGeneration:
         # Should have install in CMakeLists.txt
         assert "install(TARGETS myapp" in cmake
 
-    def test_cmake_frontend_multi_target(self):
+    def test_cmake_frontend_multi_target(self, test_output_dir):
         """Generate CMake frontend with multiple executable targets."""
-        test_dir = get_test_dir("cmake-frontend-multi-target")
+        test_dir = test_output_dir("cmake-frontend-multi-target")
 
         config = ProjectConfig(
             name="myproject",
@@ -788,9 +769,9 @@ class TestCMakeFrontendGeneration:
         assert "--target myapp" in makefile
         assert "--target myapp_tests" in makefile
 
-    def test_cmake_frontend_custom_build_dir(self):
+    def test_cmake_frontend_custom_build_dir(self, test_output_dir):
         """Generate CMake frontend with custom build directory."""
-        test_dir = get_test_dir("cmake-frontend-custom-builddir")
+        test_dir = test_output_dir("cmake-frontend-custom-builddir")
 
         config = ProjectConfig(
             name="myapp",
@@ -817,9 +798,9 @@ class TestCMakeFrontendGeneration:
         assert "BUILD_DIR ?= cmake-build" in makefile
         assert "BUILD_TYPE ?= Debug" in makefile
 
-    def test_cmake_frontend_full_project(self):
+    def test_cmake_frontend_full_project(self, test_output_dir):
         """Generate CMake frontend for full project with dependencies."""
-        test_dir = get_test_dir("cmake-frontend-full")
+        test_dir = test_output_dir("cmake-frontend-full")
 
         config = ProjectConfig(
             name="fullproject",
@@ -894,9 +875,9 @@ class TestCMakeFrontendGeneration:
 class TestBuildTypeTemplates:
     """Test project init templates generate valid output."""
 
-    def test_executable_template(self):
+    def test_executable_template(self, test_output_dir):
         """Test executable template generation."""
-        test_dir = get_test_dir("template-executable")
+        test_dir = test_output_dir("template-executable")
 
         config = ProjectConfig(
             name="myapp",
@@ -926,9 +907,9 @@ class TestBuildTypeTemplates:
         assert (test_dir / "CMakeLists.txt").exists()
         assert (test_dir / "project.json").exists()
 
-    def test_library_with_tests_template(self):
+    def test_library_with_tests_template(self, test_output_dir):
         """Test library-with-tests template generation."""
-        test_dir = get_test_dir("template-library-with-tests")
+        test_dir = test_output_dir("template-library-with-tests")
 
         config = ProjectConfig(
             name="mylib",
@@ -964,9 +945,9 @@ class TestBuildTypeTemplates:
         assert "add_library(mylib STATIC" in cmake
         assert "add_executable(mylib_tests" in cmake
 
-    def test_full_template(self):
+    def test_full_template(self, test_output_dir):
         """Test full template generation."""
-        test_dir = get_test_dir("template-full")
+        test_dir = test_output_dir("template-full")
 
         config = ProjectConfig(
             name="myproj",

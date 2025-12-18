@@ -2,7 +2,7 @@
 
 A build system generator package supporting Makefile, CMake, and cross-generator project definitions.
 
-Originally inspired by work on `shedskin.makefile` in the [shedskin project](https://github.com/shedskin/shedskin).
+Originally inspired by prior work on `shedskin.makefile` in the [shedskin project](https://github.com/shedskin/shedskin).
 
 ## Installation
 
@@ -211,4 +211,4 @@ make coverage    # Coverage report
 
 ## License
 
-MIT
+GPL-3.0-or-later

@@ -1,26 +1,24 @@
-import pytest
-import tempfile
 import os
-from buildgen import (
-    Var,
-    SVar,
-    IVar,
-    CVar,
-    AVar,
-    Builder,
-    MakefileGenerator,
-    MakefileWriter,
-    UniqueList,
-    PythonSystem,
+import tempfile
+
+import pytest
+
+from buildgen import MakefileGenerator
+from buildgen.common.platform import PythonSystem
+from buildgen.common.utils import UniqueList
+from buildgen.makefile.builder import Builder
+from buildgen.makefile.functions import (
     AUTOMATIC_VARIABLES,
     auto_var,
     get_auto_var_help,
-    makefile_wildcard,
-    makefile_patsubst,
-    makefile_subst,
     makefile_filter,
+    makefile_patsubst,
     makefile_sort,
+    makefile_subst,
+    makefile_wildcard,
 )
+from buildgen.makefile.generator import MakefileWriter
+from buildgen.makefile.variables import AVar, CVar, IVar, SVar, Var
 
 
 class TestVariableClasses:

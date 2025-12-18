@@ -1,5 +1,6 @@
 import pytest
-from buildgen import UniqueList
+
+from buildgen.common.utils import UniqueList
 
 
 class TestUniqueList:
