@@ -4,6 +4,29 @@ All notable changes to this project will be documented in this file.
 
 ## [unreleased]
 
+## [0.1.2]
+
+### Added
+
+- **scikit-build-core Project Templates** (`buildgen project init -t <type>`)
+  - `skbuild-pybind11` - Python extension using pybind11 (C++ bindings)
+  - `skbuild-cython` - Python extension using Cython
+  - `skbuild-c` - Python C extension (direct Python.h)
+  - `skbuild-nanobind` - Python extension using nanobind (modern C++ bindings)
+  - Each template includes: pyproject.toml, CMakeLists.txt, source files, __init__.py, tests
+
+- **Makefile Frontend for skbuild Projects**
+  - `make sync` - Initial environment setup (`uv sync`)
+  - `make build` - Rebuild extension (`uv sync --reinstall-package <name>`)
+  - `make test` - Run tests (`uv run pytest`)
+  - `make wheel` / `make sdist` - Build distributions (`uv build`)
+  - `make clean` / `make distclean` - Clean build artifacts
+
+- **Environment Tool Option** (`--env`)
+  - `--env uv` (default) - Use uv commands in generated Makefile
+  - `--env venv` - Use pip/python commands for traditional virtualenv workflows
+  - Example: `buildgen project init -t skbuild-pybind11 -n myext --env venv`
+
 ## [0.1.1]
 
 ### Added

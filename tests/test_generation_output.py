@@ -9,6 +9,7 @@ from buildgen import (
     ProjectConfig,
 )
 from buildgen.common.project import TargetConfig, DependencyConfig
+from buildgen.skbuild.generator import SkbuildProjectGenerator
 
 
 class TestMakefileGeneration:
@@ -1001,3 +1002,137 @@ class TestBuildTypeTemplates:
         assert "add_executable(myproj " in cmake
         assert "add_executable(myproj_tests" in cmake
         assert "find_package(Threads REQUIRED)" in cmake
+
+
+class TestSkbuildGeneration:
+    """Test scikit-build-core project generation with file output."""
+
+    def test_pybind11_project(self, test_output_dir):
+        """Generate a pybind11 scikit-build-core project."""
+        test_dir = test_output_dir("skbuild-pybind11")
+
+        gen = SkbuildProjectGenerator("myext", "skbuild-pybind11", test_dir)
+        created = gen.generate()
+
+        assert len(created) == 6
+        assert (test_dir / "Makefile").exists()
+        assert (test_dir / "pyproject.toml").exists()
+        assert (test_dir / "CMakeLists.txt").exists()
+        assert (test_dir / "src/myext/__init__.py").exists()
+        assert (test_dir / "src/myext/_core.cpp").exists()
+        assert (test_dir / "tests/test_myext.py").exists()
+
+        # Verify pyproject.toml content
+        pyproject = (test_dir / "pyproject.toml").read_text()
+        assert 'name = "myext"' in pyproject
+        assert "scikit-build-core" in pyproject
+        assert "pybind11" in pyproject
+        assert "scikit_build_core.build" in pyproject
+
+        # Verify Makefile content
+        makefile = (test_dir / "Makefile").read_text()
+        assert "uv sync" in makefile
+        assert "uv sync --reinstall-package myext" in makefile
+        assert "uv run pytest" in makefile
+
+        # Verify CMakeLists.txt content
+        cmake = (test_dir / "CMakeLists.txt").read_text()
+        assert "cmake_minimum_required" in cmake
+        assert "find_package(pybind11" in cmake
+        assert "pybind11_add_module" in cmake
+
+        # Verify C++ source
+        cpp = (test_dir / "src/myext/_core.cpp").read_text()
+        assert "#include <pybind11/pybind11.h>" in cpp
+        assert "PYBIND11_MODULE" in cpp
+
+    def test_cython_project(self, test_output_dir):
+        """Generate a Cython scikit-build-core project."""
+        test_dir = test_output_dir("skbuild-cython")
+
+        gen = SkbuildProjectGenerator("cyext", "skbuild-cython", test_dir)
+        created = gen.generate()
+
+        assert len(created) == 6
+        assert (test_dir / "Makefile").exists()
+        assert (test_dir / "pyproject.toml").exists()
+        assert (test_dir / "CMakeLists.txt").exists()
+        assert (test_dir / "src/cyext/__init__.py").exists()
+        assert (test_dir / "src/cyext/_core.pyx").exists()
+        assert (test_dir / "tests/test_cyext.py").exists()
+
+        # Verify pyproject.toml content
+        pyproject = (test_dir / "pyproject.toml").read_text()
+        assert 'name = "cyext"' in pyproject
+        assert "scikit-build-core" in pyproject
+        assert "cython" in pyproject
+
+        # Verify Cython source
+        pyx = (test_dir / "src/cyext/_core.pyx").read_text()
+        assert "cpdef int add" in pyx
+        assert "cpdef str greet" in pyx
+
+    def test_c_extension_project(self, test_output_dir):
+        """Generate a C extension scikit-build-core project."""
+        test_dir = test_output_dir("skbuild-c")
+
+        gen = SkbuildProjectGenerator("cext", "skbuild-c", test_dir)
+        created = gen.generate()
+
+        assert len(created) == 6
+        assert (test_dir / "Makefile").exists()
+        assert (test_dir / "pyproject.toml").exists()
+        assert (test_dir / "CMakeLists.txt").exists()
+        assert (test_dir / "src/cext/__init__.py").exists()
+        assert (test_dir / "src/cext/_core.c").exists()
+        assert (test_dir / "tests/test_cext.py").exists()
+
+        # Verify pyproject.toml content
+        pyproject = (test_dir / "pyproject.toml").read_text()
+        assert 'name = "cext"' in pyproject
+        assert "scikit-build-core" in pyproject
+        # Should NOT have pybind11, cython, or nanobind
+        assert "pybind11" not in pyproject
+        assert "cython" not in pyproject
+        assert "nanobind" not in pyproject
+
+        # Verify CMakeLists.txt content
+        cmake = (test_dir / "CMakeLists.txt").read_text()
+        assert "find_package(Python REQUIRED" in cmake
+        assert "python_add_library" in cmake
+
+        # Verify C source
+        c_src = (test_dir / "src/cext/_core.c").read_text()
+        assert "#include <Python.h>" in c_src
+        assert "PyInit__core" in c_src
+
+    def test_nanobind_project(self, test_output_dir):
+        """Generate a nanobind scikit-build-core project."""
+        test_dir = test_output_dir("skbuild-nanobind")
+
+        gen = SkbuildProjectGenerator("nbext", "skbuild-nanobind", test_dir)
+        created = gen.generate()
+
+        assert len(created) == 6
+        assert (test_dir / "Makefile").exists()
+        assert (test_dir / "pyproject.toml").exists()
+        assert (test_dir / "CMakeLists.txt").exists()
+        assert (test_dir / "src/nbext/__init__.py").exists()
+        assert (test_dir / "src/nbext/_core.cpp").exists()
+        assert (test_dir / "tests/test_nbext.py").exists()
+
+        # Verify pyproject.toml content
+        pyproject = (test_dir / "pyproject.toml").read_text()
+        assert 'name = "nbext"' in pyproject
+        assert "scikit-build-core" in pyproject
+        assert "nanobind" in pyproject
+
+        # Verify CMakeLists.txt content
+        cmake = (test_dir / "CMakeLists.txt").read_text()
+        assert "find_package(nanobind" in cmake
+        assert "nanobind_add_module" in cmake
+
+        # Verify C++ source
+        cpp = (test_dir / "src/nbext/_core.cpp").read_text()
+        assert "#include <nanobind/nanobind.h>" in cpp
+        assert "NB_MODULE" in cpp

@@ -41,6 +41,11 @@ BUILD_TYPES = {
     "library-with-tests": "Static library with test executable",
     "app-with-lib": "Executable linked to internal static library",
     "full": "Library + app + tests with Threads dependency",
+    # scikit-build-core templates
+    "skbuild-pybind11": "Python extension using pybind11 (C++ bindings)",
+    "skbuild-cython": "Python extension using Cython",
+    "skbuild-c": "Python C extension (direct Python.h)",
+    "skbuild-nanobind": "Python extension using nanobind (modern C++ bindings)",
 }
 
 
@@ -54,11 +59,29 @@ def cmd_project_types(args: argparse.Namespace) -> None:
 def cmd_project_init(args: argparse.Namespace) -> None:
     """Create a sample project configuration file."""
     from buildgen.common.project import TargetConfig, DependencyConfig
+    from buildgen.skbuild.generator import is_skbuild_type, SkbuildProjectGenerator
 
     output = Path(args.output)
     ext = output.suffix.lower()
     name = args.name or "myproject"
     build_type = args.type
+
+    # Handle scikit-build-core templates separately
+    if is_skbuild_type(build_type):
+        # For skbuild projects, -o specifies output directory (default: ./{name})
+        if args.output == "project.json":
+            output_dir = Path(name)
+        else:
+            output_dir = Path(args.output)
+        env_tool = getattr(args, "env", "uv")
+        gen = SkbuildProjectGenerator(name, build_type, output_dir, env_tool=env_tool)
+        created = gen.generate()
+        print(f"Created {build_type} project: {gen.output_dir}/")
+        print(f"  (using {env_tool} for Makefile commands)")
+        for path in created:
+            rel_path = path.relative_to(gen.output_dir)
+            print(f"  {rel_path}")
+        return
 
     targets: list[TargetConfig] = []
     dependencies: list[DependencyConfig] = []
@@ -268,6 +291,13 @@ def add_project_subparsers(subparsers: argparse._SubParsersAction) -> None:
         choices=list(BUILD_TYPES.keys()),
         default="executable",
         help="Project type template (default: executable)",
+    )
+    init_parser.add_argument(
+        "-e",
+        "--env",
+        choices=["uv", "venv"],
+        default="uv",
+        help="Environment tool for Makefile (skbuild-* only, default: uv)",
     )
     init_parser.set_defaults(func=cmd_project_init)
 

@@ -30,6 +30,7 @@ buildgen project generate -c project.json --cmake
 - **Cross-Generator**: Define project once in JSON/YAML, generate both build systems
 - **CMake Frontend**: Use CMake as build system with convenient Makefile wrapper
 - **Project Templates**: Quick-start templates for common project types
+- **scikit-build-core Templates**: Python extension project scaffolding (pybind11, cython, nanobind, C)
 
 ## Usage
 
@@ -177,6 +178,48 @@ buildgen project types
 | `library-with-tests` | Library + test executable |
 | `app-with-lib` | Executable with internal library |
 | `full` | Library + app + tests + Threads |
+| `skbuild-pybind11` | Python extension using pybind11 |
+| `skbuild-cython` | Python extension using Cython |
+| `skbuild-c` | Python C extension (Python.h) |
+| `skbuild-nanobind` | Python extension using nanobind |
+
+### scikit-build-core Projects
+
+Generate complete Python extension projects with scikit-build-core:
+
+```bash
+# Create a pybind11 extension project
+buildgen project init -t skbuild-pybind11 -n myext
+
+# Use traditional virtualenv instead of uv
+buildgen project init -t skbuild-pybind11 -n myext --env venv
+```
+
+This creates a complete project structure:
+
+```
+myext/
+  pyproject.toml      # scikit-build-core configuration
+  CMakeLists.txt      # CMake build instructions
+  Makefile            # Convenience wrapper
+  src/myext/
+    __init__.py       # Python package
+    _core.cpp         # C++ extension source
+  tests/
+    test_myext.py     # pytest tests
+```
+
+The generated Makefile provides convenient commands (using `uv` by default):
+
+```bash
+make sync     # Initial setup (uv sync)
+make build    # Rebuild extension after code changes
+make test     # Run tests (uv run pytest)
+make wheel    # Build wheel distribution
+make clean    # Remove build artifacts
+```
+
+For traditional virtualenv workflows, use `--env venv` to generate pip/python commands instead.
 
 ## Low-Level API
 
@@ -205,7 +248,7 @@ gen.generate()
 ## Development
 
 ```bash
-make test        # Run tests (194 tests)
+make test        # Run tests (224 tests)
 make coverage    # Coverage report
 ```
 
