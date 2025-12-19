@@ -36,6 +36,7 @@ typecheck:
 build:
 	@echo "building distribution"
 	@uv build
+	@uv run twine check dist/*
 
 check: build
 	@echo "checking distribution with twine"

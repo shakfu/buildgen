@@ -1,8 +1,10 @@
 # buildgen
 
-A build system generator package supporting Makefile, CMake, and cross-generator project definitions.
+A zero-dependency[^1] build system generator package supporting Makefile, CMake, and cross-generator project definitions.
 
 Originally inspired by prior work on `shedskin.makefile` in the [shedskin project](https://github.com/shedskin/shedskin).
+
+[^1]: uses an embedded *lite* version of [Mako Templates](https://www.makotemplates.org/)
 
 ## Installation
 
