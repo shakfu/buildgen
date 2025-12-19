@@ -13,14 +13,14 @@ pip install buildgen
 ## Quick Start
 
 ```bash
-# Create a project config
-buildgen project init -t full -n myproject -o project.json
+# Create a C++ project
+buildgen project init -n myapp --recipe cpp/executable
 
-# Generate both Makefile and CMakeLists.txt
-buildgen project generate -c project.json --all
+# Create a Python extension with pybind11
+buildgen project init -n myext --recipe py/pybind11
 
-# Or generate CMake with Makefile frontend
-buildgen project generate -c project.json --cmake
+# List available recipes
+buildgen project recipes
 ```
 
 ## Features
@@ -28,27 +28,32 @@ buildgen project generate -c project.json --cmake
 - **Makefile Generation**: Programmatic Makefile creation with variables, pattern rules, conditionals
 - **CMake Generation**: Full CMakeLists.txt generation with find_package, FetchContent, install rules
 - **Cross-Generator**: Define project once in JSON/YAML, generate both build systems
-- **CMake Frontend**: Use CMake as build system with convenient Makefile wrapper
+- **CMake Frontend**: Use CMake as build system with convenient Makefile frontend
 - **Project Templates**: Quick-start templates for common project types
 - **scikit-build-core Templates**: Python extension project scaffolding (pybind11, cython, nanobind, C)
+- **Template Customization**: Override templates per-project, per-user, or via environment variable (Mako syntax)
 
 ## Usage
 
 ### CLI
 
 ```bash
-# Project configuration workflow (recommended)
-buildgen project init -t full -n myproject -o project.json
-buildgen project generate -c project.json --all
-buildgen project types  # List available templates
+# Create projects from recipes
+buildgen project init -n myapp --recipe cpp/executable
+buildgen project init -n mylib --recipe c/static
+buildgen project init -n myext --recipe py/pybind11
+
+# Short form
+buildgen project init -n myapp -r cpp/full
+
+# List available recipes
+buildgen project recipes
 
 # Direct Makefile generation
 buildgen makefile generate -o Makefile --targets "all:main.o:"
-buildgen makefile build myprogram --cppfiles main.cpp
 
 # Direct CMake generation
 buildgen cmake generate -o CMakeLists.txt --project myapp --cxx-standard 17
-buildgen cmake build -S . -B build --build-type Release
 ```
 
 ### Python API
@@ -163,36 +168,57 @@ make CMAKE_FLAGS="-DFOO=bar"
 }
 ```
 
-### Project Templates
+### Project Recipes
+
+Recipes use a `category/variant` naming convention:
 
 ```bash
-buildgen project types
+buildgen project recipes
 ```
 
-| Template | Description |
-|----------|-------------|
-| `executable` | Single executable (src/main.cpp) |
-| `static` | Static library with include/ |
-| `shared` | Shared library with -fPIC |
-| `header-only` | Header-only/interface library |
-| `library-with-tests` | Library + test executable |
-| `app-with-lib` | Executable with internal library |
-| `full` | Library + app + tests + Threads |
-| `skbuild-pybind11` | Python extension using pybind11 |
-| `skbuild-cython` | Python extension using Cython |
-| `skbuild-c` | Python C extension (Python.h) |
-| `skbuild-nanobind` | Python extension using nanobind |
+**C++ Recipes** (CMake + Makefile frontend):
 
-### scikit-build-core Projects
+| Recipe | Description |
+|--------|-------------|
+| `cpp/executable` | Single executable |
+| `cpp/static` | Static library |
+| `cpp/shared` | Shared library (-fPIC) |
+| `cpp/header-only` | Header-only library |
+| `cpp/library-with-tests` | Library + tests |
+| `cpp/app-with-lib` | App with internal library |
+| `cpp/full` | Library + app + tests |
+
+**C Recipes** (CMake + Makefile frontend):
+
+| Recipe | Description |
+|--------|-------------|
+| `c/executable` | Single executable |
+| `c/static` | Static library |
+| `c/shared` | Shared library (-fPIC) |
+| `c/header-only` | Header-only library |
+| `c/library-with-tests` | Library + tests |
+| `c/app-with-lib` | App with internal library |
+| `c/full` | Library + app + tests |
+
+**Python Extension Recipes** (scikit-build-core):
+
+| Recipe | Description |
+|--------|-------------|
+| `py/pybind11` | C++ extension using pybind11 |
+| `py/nanobind` | C++ extension using nanobind |
+| `py/cython` | Extension using Cython |
+| `py/cext` | C extension (Python.h) |
+
+### Python Extension Projects
 
 Generate complete Python extension projects with scikit-build-core:
 
 ```bash
 # Create a pybind11 extension project
-buildgen project init -t skbuild-pybind11 -n myext
+buildgen project init -n myext --recipe py/pybind11
 
 # Use traditional virtualenv instead of uv
-buildgen project init -t skbuild-pybind11 -n myext --env venv
+buildgen project init -n myext --recipe py/pybind11 --env venv
 ```
 
 This creates a complete project structure:
@@ -221,6 +247,61 @@ make clean    # Remove build artifacts
 
 For traditional virtualenv workflows, use `--env venv` to generate pip/python commands instead.
 
+## Template Customization
+
+Templates can be customized without modifying buildgen. Override files are resolved in this order (first match wins):
+
+1. `$BUILDGEN_TEMPLATES/{recipe}/` - Environment variable (for CI/CD)
+2. `.buildgen/templates/{recipe}/` - Project-local overrides
+3. `~/.buildgen/templates/{recipe}/` - User-global defaults
+4. Built-in templates
+
+### Template Commands
+
+```bash
+# List available templates and show which have overrides
+buildgen templates list
+
+# Copy templates for local customization
+buildgen templates copy py/pybind11
+
+# Copy to global location for user-wide defaults
+buildgen templates copy py/pybind11 --global
+
+# Show where each template file is resolved from
+buildgen templates show py/pybind11
+```
+
+### Customizing Templates
+
+1. Copy the templates you want to customize:
+   ```bash
+   buildgen templates copy py/pybind11
+   ```
+
+2. Edit the `.mako` files in `.buildgen/templates/py/pybind11/`:
+   ```bash
+   # Customize pyproject.toml template
+   edit .buildgen/templates/py/pybind11/pyproject.toml.mako
+   ```
+
+3. Generate projects - your customizations will be used:
+   ```bash
+   buildgen project init -n myext --recipe py/pybind11
+   ```
+
+Templates use [Mako](https://www.makotemplates.org/) syntax with `${variable}` for substitution.
+
+### Per-File Overrides
+
+You can override individual files while keeping others from built-in templates. For example, to customize only `pyproject.toml`:
+
+```bash
+mkdir -p .buildgen/templates/py/pybind11
+cp $(buildgen templates show py/pybind11 | grep pyproject) .buildgen/templates/py/pybind11/
+# Edit your local copy
+```
+
 ## Low-Level API
 
 For fine-grained control, use the generators directly:
@@ -248,9 +329,15 @@ gen.generate()
 ## Development
 
 ```bash
-make test        # Run tests (224 tests)
+make test        # Run tests
+make lint        # Run ruff check
 make coverage    # Coverage report
 ```
+
+## Credits
+
+- Template rendering powered by an embedded version of [Mako Templates](https://www.makotemplates.org/) (MIT License)
+- Originally inspired by prior work in `shedskin.makefile` in the [shedskin project](https://github.com/shedskin/shedskin)
 
 ## License
 

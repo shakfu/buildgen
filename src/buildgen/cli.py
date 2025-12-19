@@ -8,6 +8,18 @@ from buildgen import __version__
 from buildgen.makefile.cli import add_makefile_subparsers
 from buildgen.cmake.cli import add_cmake_subparsers
 from buildgen.common.project import ProjectConfig
+from buildgen.recipes import (
+    RECIPES,
+    LEGACY_TYPE_MAPPING,
+    get_recipe,
+    get_recipes_by_category,
+    is_valid_recipe,
+    resolve_recipe_name,
+)
+from buildgen.templates.resolver import (
+    TemplateResolver,
+    copy_templates,
+)
 
 
 def cmd_project_generate(args: argparse.Namespace) -> None:
@@ -33,182 +45,91 @@ def cmd_project_generate(args: argparse.Namespace) -> None:
         print("No output format specified. Use --makefile, --cmake, or --all")
 
 
-BUILD_TYPES = {
-    "executable": "Single executable (src/main.cpp)",
-    "static": "Static library (src/lib.cpp, include/)",
-    "shared": "Shared library with -fPIC",
-    "header-only": "Header-only/interface library",
-    "library-with-tests": "Static library with test executable",
-    "app-with-lib": "Executable linked to internal static library",
-    "full": "Library + app + tests with Threads dependency",
-    # scikit-build-core templates
-    "skbuild-pybind11": "Python extension using pybind11 (C++ bindings)",
-    "skbuild-cython": "Python extension using Cython",
-    "skbuild-c": "Python C extension (direct Python.h)",
-    "skbuild-nanobind": "Python extension using nanobind (modern C++ bindings)",
-}
-
-
 def cmd_project_types(args: argparse.Namespace) -> None:
-    """List available project build types."""
-    print("Available build types:\n")
-    for name, description in BUILD_TYPES.items():
-        print(f"  {name:<20} {description}")
+    """List available project build types (legacy, redirects to recipes)."""
+    cmd_project_recipes(args)
+
+
+def cmd_project_recipes(args: argparse.Namespace) -> None:
+    """List available project recipes."""
+    categories = get_recipes_by_category()
+
+    # Category display names
+    category_names = {
+        "cpp": "C++ Recipes",
+        "c": "C Recipes",
+        "py": "Python Extension Recipes",
+    }
+
+    print("Available recipes:\n")
+    for category in ["cpp", "c", "py"]:
+        if category not in categories:
+            continue
+        print(f"{category_names.get(category, category)}:")
+        for recipe in categories[category]:
+            print(f"  {recipe.name:<25} {recipe.description}")
+        print()
 
 
 def cmd_project_init(args: argparse.Namespace) -> None:
-    """Create a sample project configuration file."""
-    from buildgen.common.project import TargetConfig, DependencyConfig
-    from buildgen.skbuild.generator import is_skbuild_type, SkbuildProjectGenerator
+    """Create a project from a recipe template."""
+    from buildgen.skbuild.generator import SkbuildProjectGenerator
+    from buildgen.cmake.project_generator import CMakeProjectGenerator, is_cmake_recipe
 
-    output = Path(args.output)
-    ext = output.suffix.lower()
     name = args.name or "myproject"
-    build_type = args.type
 
-    # Handle scikit-build-core templates separately
-    if is_skbuild_type(build_type):
-        # For skbuild projects, -o specifies output directory (default: ./{name})
-        if args.output == "project.json":
-            output_dir = Path(name)
+    # Resolve recipe: prefer --recipe, fall back to --type with legacy mapping
+    recipe_name = getattr(args, "recipe", None)
+    if not recipe_name:
+        # Fall back to legacy --type option
+        legacy_type = getattr(args, "type", None)
+        if legacy_type:
+            recipe_name = resolve_recipe_name(legacy_type)
         else:
-            output_dir = Path(args.output)
+            # Default to cpp/executable if neither --recipe nor --type specified
+            recipe_name = "cpp/executable"
+
+    # Validate and get recipe
+    if not is_valid_recipe(recipe_name):
+        print(f"Error: Unknown recipe '{recipe_name}'", file=sys.stderr)
+        print("\nUse 'buildgen project recipes' to list available recipes.")
+        sys.exit(1)
+
+    recipe = get_recipe(recipe_name)
+
+    # Determine output directory
+    if args.output == "project.json":
+        output_dir = Path(name)
+    else:
+        output_dir = Path(args.output)
+
+    # Handle scikit-build-core templates (py/* recipes)
+    if recipe.build_system == "skbuild":
+        # Map recipe variant to skbuild template type
+        skbuild_type = f"skbuild-{recipe.framework}"
         env_tool = getattr(args, "env", "uv")
-        gen = SkbuildProjectGenerator(name, build_type, output_dir, env_tool=env_tool)
+        gen = SkbuildProjectGenerator(name, skbuild_type, output_dir, env_tool=env_tool)
         created = gen.generate()
-        print(f"Created {build_type} project: {gen.output_dir}/")
+        print(f"Created {recipe.name} project: {gen.output_dir}/")
         print(f"  (using {env_tool} for Makefile commands)")
         for path in created:
             rel_path = path.relative_to(gen.output_dir)
             print(f"  {rel_path}")
         return
 
-    targets: list[TargetConfig] = []
-    dependencies: list[DependencyConfig] = []
+    # Handle CMake-based templates (cpp/* and c/* recipes)
+    if is_cmake_recipe(recipe_name):
+        cmake_gen = CMakeProjectGenerator(name, recipe_name, output_dir)
+        created = cmake_gen.generate()
+        print(f"Created {recipe.name} project: {cmake_gen.output_dir}/")
+        for path in created:
+            rel_path = path.relative_to(cmake_gen.output_dir)
+            print(f"  {rel_path}")
+        return
 
-    if build_type == "executable":
-        targets = [
-            TargetConfig(
-                name=name,
-                target_type="executable",
-                sources=["src/main.cpp"],
-                install=True,
-            ),
-        ]
-
-    elif build_type == "static":
-        targets = [
-            TargetConfig(
-                name=name,
-                target_type="static",
-                sources=["src/lib.cpp"],
-                include_dirs=["include"],
-                install=True,
-            ),
-        ]
-
-    elif build_type == "shared":
-        targets = [
-            TargetConfig(
-                name=name,
-                target_type="shared",
-                sources=["src/lib.cpp"],
-                include_dirs=["include"],
-                compile_options=["-fPIC"],
-                install=True,
-            ),
-        ]
-
-    elif build_type == "header-only":
-        targets = [
-            TargetConfig(
-                name=name,
-                target_type="interface",
-                sources=[],
-                include_dirs=["include"],
-                install=True,
-            ),
-        ]
-
-    elif build_type == "library-with-tests":
-        targets = [
-            TargetConfig(
-                name=name,
-                target_type="static",
-                sources=["src/lib.cpp"],
-                include_dirs=["include"],
-                install=True,
-            ),
-            TargetConfig(
-                name=f"{name}_tests",
-                target_type="executable",
-                sources=["tests/test_main.cpp"],
-                include_dirs=["include"],
-                link_libraries=[name],
-            ),
-        ]
-
-    elif build_type == "app-with-lib":
-        targets = [
-            TargetConfig(
-                name=f"{name}_lib",
-                target_type="static",
-                sources=["src/lib.cpp"],
-                include_dirs=["include"],
-            ),
-            TargetConfig(
-                name=name,
-                target_type="executable",
-                sources=["src/main.cpp"],
-                link_libraries=[f"{name}_lib"],
-                install=True,
-            ),
-        ]
-
-    elif build_type == "full":
-        dependencies = [
-            DependencyConfig(name="Threads"),
-        ]
-        targets = [
-            TargetConfig(
-                name=f"{name}_lib",
-                target_type="static",
-                sources=["src/lib.cpp"],
-                include_dirs=["include"],
-                install=True,
-            ),
-            TargetConfig(
-                name=name,
-                target_type="executable",
-                sources=["src/main.cpp"],
-                link_libraries=[f"{name}_lib", "Threads::Threads"],
-                install=True,
-            ),
-            TargetConfig(
-                name=f"{name}_tests",
-                target_type="executable",
-                sources=["tests/test_main.cpp"],
-                include_dirs=["include"],
-                link_libraries=[f"{name}_lib"],
-            ),
-        ]
-
-    sample = ProjectConfig(
-        name=name,
-        version="1.0.0",
-        description=f"A {build_type} project",
-        cxx_standard=17,
-        compile_options=["-Wall", "-Wextra"],
-        targets=targets,
-        dependencies=dependencies,
-    )
-
-    if ext in (".yaml", ".yml"):
-        sample.to_yaml(output)
-    else:
-        sample.to_json(output)
-
-    print(f"Created {build_type} project configuration: {output}")
+    # Fallback: should not reach here for valid recipes
+    print(f"Error: No generator available for recipe '{recipe_name}'", file=sys.stderr)
+    sys.exit(1)
 
 
 def add_project_subparsers(subparsers: argparse._SubParsersAction) -> None:
@@ -260,19 +181,36 @@ def add_project_subparsers(subparsers: argparse._SubParsersAction) -> None:
     )
     gen_parser.set_defaults(func=cmd_project_generate)
 
-    # project types
+    # project types (legacy, redirects to recipes)
     types_parser = project_subparsers.add_parser(
         "types",
-        help="List available project build types",
+        help="List available project types (legacy, use 'recipes' instead)",
     )
     types_parser.set_defaults(func=cmd_project_types)
+
+    # project recipes
+    recipes_parser = project_subparsers.add_parser(
+        "recipes",
+        help="List available project recipes",
+    )
+    recipes_parser.set_defaults(func=cmd_project_recipes)
+
+    # Build valid choices for --type (legacy names) and --recipe (new names)
+    legacy_choices = list(LEGACY_TYPE_MAPPING.keys())
+    recipe_choices = list(RECIPES.keys())
 
     # project init
     init_parser = project_subparsers.add_parser(
         "init",
         help="Create a sample project configuration file",
         formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog="Use 'buildgen project types' to list available build types.",
+        epilog="""
+Examples:
+  buildgen project init -n myapp --recipe cpp/executable
+  buildgen project init -n mylib --recipe c/static
+  buildgen project init -n myext --recipe py/pybind11
+
+Use 'buildgen project recipes' to list available recipes.""",
     )
     init_parser.add_argument(
         "-o",
@@ -286,20 +224,214 @@ def add_project_subparsers(subparsers: argparse._SubParsersAction) -> None:
         help="Project name (default: myproject)",
     )
     init_parser.add_argument(
+        "-r",
+        "--recipe",
+        choices=recipe_choices,
+        help="Project recipe (e.g., cpp/executable, py/pybind11)",
+    )
+    init_parser.add_argument(
         "-t",
         "--type",
-        choices=list(BUILD_TYPES.keys()),
-        default="executable",
-        help="Project type template (default: executable)",
+        choices=legacy_choices,
+        help="(Legacy) Project type - use --recipe instead",
     )
     init_parser.add_argument(
         "-e",
         "--env",
         choices=["uv", "venv"],
         default="uv",
-        help="Environment tool for Makefile (skbuild-* only, default: uv)",
+        help="Environment tool for Makefile (py/* recipes only, default: uv)",
     )
     init_parser.set_defaults(func=cmd_project_init)
+
+
+def cmd_templates_list(args: argparse.Namespace) -> None:
+    """List available template types."""
+    from buildgen.templates.resolver import get_builtin_template_recipes
+
+    resolver = TemplateResolver(Path.cwd())
+    recipes = get_builtin_template_recipes()
+
+    # Group by category
+    by_category: dict[str, list[str]] = {}
+    for recipe in recipes:
+        category = recipe.split("/")[0]
+        if category not in by_category:
+            by_category[category] = []
+        by_category[category].append(recipe)
+
+    category_names = {
+        "py": "Python Extension Templates",
+        "cpp": "C++ Templates",
+        "c": "C Templates",
+    }
+
+    print("Available templates:\n")
+    for category, recipe_list in by_category.items():
+        print(f"{category_names.get(category, category)}:")
+        for recipe in recipe_list:
+            # Check for overrides
+            overrides = resolver.list_overrides(recipe)
+            if overrides:
+                sources = set(overrides.values())
+                source_str = ", ".join(sorted(sources))
+                print(f"  {recipe:<20} (override: {source_str})")
+            else:
+                print(f"  {recipe:<20}")
+        print()
+
+
+def cmd_templates_copy(args: argparse.Namespace) -> None:
+    """Copy templates for customization."""
+    from buildgen.skbuild.templates import get_recipe_path
+
+    template_type = args.recipe
+    # Convert legacy type to recipe path if needed
+    recipe_path = get_recipe_path(template_type)
+
+    # Determine destination
+    if args.to_global:
+        dest_dir = Path.home() / ".buildgen/templates"
+    else:
+        dest_dir = Path.cwd() / ".buildgen/templates"
+
+    try:
+        copied = copy_templates(recipe_path, dest_dir)
+        print(f"Copied {len(copied)} files to {dest_dir / recipe_path}/")
+        for path in copied:
+            rel_path = path.relative_to(dest_dir)
+            print(f"  {rel_path}")
+    except ValueError as e:
+        print(f"Error: {e}", file=sys.stderr)
+        sys.exit(1)
+
+
+def cmd_templates_show(args: argparse.Namespace) -> None:
+    """Show template resolution details."""
+    from buildgen.skbuild.templates import (
+        resolve_template_files,
+        SKBUILD_TYPES,
+        get_recipe_path,
+        LEGACY_TO_RECIPE_PATH,
+    )
+
+    template_type = args.recipe
+    recipe_path = get_recipe_path(template_type)
+
+    # Check if it's a valid skbuild type (either legacy or recipe path)
+    if (
+        template_type not in SKBUILD_TYPES
+        and template_type not in LEGACY_TO_RECIPE_PATH.values()
+    ):
+        print(f"Unknown template: {template_type}", file=sys.stderr)
+        print("\nUse 'buildgen templates list' to see available templates.")
+        sys.exit(1)
+
+    # For show, we need the legacy type name to look up TEMPLATE_FILES
+    # Find the legacy name from recipe path
+    legacy_type = template_type
+    if template_type in LEGACY_TO_RECIPE_PATH.values():
+        for legacy, recipe in LEGACY_TO_RECIPE_PATH.items():
+            if recipe == template_type:
+                legacy_type = legacy
+                break
+
+    env_tool = args.env
+    resolved = resolve_template_files(legacy_type, env_tool, Path.cwd())
+
+    print(f"Template: {recipe_path}")
+    print(f"Environment tool: {env_tool}")
+    print("\nFiles:")
+    for output_path, (template_path, source) in resolved.items():
+        # Clean up output path for display
+        display_path = output_path.replace("${name}", "<name>")
+        print(f"  {display_path:<30} -> ({source}) {template_path.name}")
+
+
+def add_templates_subparsers(subparsers: argparse._SubParsersAction) -> None:
+    """Add templates subcommand parsers."""
+    from buildgen.skbuild.templates import SKBUILD_TYPES
+    from buildgen.templates.resolver import get_builtin_template_recipes
+
+    # Build choices: recipe paths + legacy names for backward compat
+    recipe_choices = get_builtin_template_recipes()
+    legacy_choices = list(SKBUILD_TYPES.keys())
+    all_choices = recipe_choices + legacy_choices
+
+    templates_parser = subparsers.add_parser(
+        "templates",
+        help="Manage project templates",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Template Override Hierarchy:
+  Templates are resolved in this order (first match wins):
+  1. $BUILDGEN_TEMPLATES/{recipe}/  (environment variable)
+  2. .buildgen/templates/{recipe}/  (project-local)
+  3. ~/.buildgen/templates/{recipe}/ (user-global)
+  4. Built-in templates
+
+Examples:
+  # List available templates
+  buildgen templates list
+
+  # Copy pybind11 templates for local customization
+  buildgen templates copy py/pybind11
+
+  # Copy templates to global location
+  buildgen templates copy py/pybind11 --global
+
+  # Show where templates are resolved from
+  buildgen templates show py/pybind11
+        """,
+    )
+
+    templates_subparsers = templates_parser.add_subparsers(
+        dest="templates_command", help="Template commands"
+    )
+
+    # templates list
+    list_parser = templates_subparsers.add_parser(
+        "list",
+        help="List available template types",
+    )
+    list_parser.set_defaults(func=cmd_templates_list)
+
+    # templates copy
+    copy_parser = templates_subparsers.add_parser(
+        "copy",
+        help="Copy templates for customization",
+    )
+    copy_parser.add_argument(
+        "recipe",
+        choices=all_choices,
+        help="Recipe template to copy (e.g., py/pybind11)",
+    )
+    copy_parser.add_argument(
+        "--global",
+        dest="to_global",
+        action="store_true",
+        help="Copy to ~/.buildgen/templates/ instead of .buildgen/templates/",
+    )
+    copy_parser.set_defaults(func=cmd_templates_copy)
+
+    # templates show
+    show_parser = templates_subparsers.add_parser(
+        "show",
+        help="Show template resolution details",
+    )
+    show_parser.add_argument(
+        "recipe",
+        choices=all_choices,
+        help="Recipe template to show (e.g., py/pybind11)",
+    )
+    show_parser.add_argument(
+        "-e",
+        "--env",
+        choices=["uv", "venv"],
+        default="uv",
+        help="Environment tool (default: uv)",
+    )
+    show_parser.set_defaults(func=cmd_templates_show)
 
 
 def create_parser() -> argparse.ArgumentParser:
@@ -349,6 +481,9 @@ Note: Escape dollar signs with backslash when passing Makefile/CMake variables v
     # Add project subcommands
     add_project_subparsers(subparsers)
 
+    # Add templates subcommands
+    add_templates_subparsers(subparsers)
+
     return parser
 
 
@@ -387,6 +522,17 @@ def main() -> None:
     elif args.command == "project":
         if not hasattr(args, "project_command") or not args.project_command:
             parser.parse_args(["project", "--help"])
+        elif hasattr(args, "func"):
+            try:
+                args.func(args)
+            except Exception as e:
+                print(f"Error: {e}", file=sys.stderr)
+                sys.exit(1)
+
+    # Handle templates subcommands
+    elif args.command == "templates":
+        if not hasattr(args, "templates_command") or not args.templates_command:
+            parser.parse_args(["templates", "--help"])
         elif hasattr(args, "func"):
             try:
                 args.func(args)

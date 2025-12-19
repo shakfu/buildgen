@@ -7,7 +7,7 @@ from buildgen.skbuild.generator import (
     get_skbuild_types,
     is_skbuild_type,
 )
-from buildgen.skbuild.templates import TEMPLATES, SKBUILD_TYPES
+from buildgen.skbuild.templates import TEMPLATE_FILES, SKBUILD_TYPES
 
 
 class TestSkbuildTypes:
@@ -39,18 +39,18 @@ class TestTemplates:
     def test_all_types_have_templates(self):
         """Test all SKBUILD_TYPES have corresponding templates."""
         for template_type in SKBUILD_TYPES:
-            assert template_type in TEMPLATES
+            assert template_type in TEMPLATE_FILES
 
     def test_templates_have_required_files(self):
         """Test all templates include required files."""
         required_files = ["Makefile", "pyproject.toml", "CMakeLists.txt"]
-        for template_type, files in TEMPLATES.items():
+        for template_type, files in TEMPLATE_FILES.items():
             for required in required_files:
                 assert required in files, f"{template_type} missing {required}"
 
     def test_templates_have_source_files(self):
         """Test all templates include source files."""
-        for template_type, files in TEMPLATES.items():
+        for template_type, files in TEMPLATE_FILES.items():
             source_files = [f for f in files if "/_core." in f]
             assert len(source_files) == 1, (
                 f"{template_type} should have one _core source file"
@@ -58,14 +58,14 @@ class TestTemplates:
 
     def test_templates_have_init_py(self):
         """Test all templates include __init__.py."""
-        for template_type, files in TEMPLATES.items():
+        for template_type, files in TEMPLATE_FILES.items():
             init_files = [f for f in files if "__init__.py" in f]
             assert len(init_files) == 1, f"{template_type} should have __init__.py"
 
     def test_templates_have_test_file(self):
         """Test all templates include test file."""
-        for template_type, files in TEMPLATES.items():
-            test_files = [f for f in files if "test_" in f]
+        for template_type, files in TEMPLATE_FILES.items():
+            test_files = [f for f in files if "test_" in f or "/test." in f]
             assert len(test_files) == 1, f"{template_type} should have test file"
 
 

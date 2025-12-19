@@ -3,7 +3,12 @@
 from pathlib import Path
 from typing import Optional
 
-from buildgen.skbuild.templates import TEMPLATES, SKBUILD_TYPES, MAKEFILE_BY_ENV
+from buildgen._mako.template import Template
+from buildgen.skbuild.templates import (
+    SKBUILD_TYPES,
+    TEMPLATE_FILES,
+    resolve_template_files,
+)
 
 # Valid environment tool choices
 ENV_TOOLS = ("uv", "venv")
@@ -26,6 +31,13 @@ class SkbuildProjectGenerator:
     - skbuild-c: Pure C extension
     - skbuild-nanobind: Modern C++ bindings with nanobind
 
+    Template Override Support:
+    Templates are resolved in this order (first match wins):
+    1. $BUILDGEN_TEMPLATES/skbuild/{type}/
+    2. {project_dir}/.buildgen/templates/skbuild/{type}/
+    3. ~/.buildgen/templates/skbuild/{type}/
+    4. Built-in templates
+
     Usage:
         gen = SkbuildProjectGenerator("myext", "skbuild-pybind11")
         files = gen.generate()
@@ -33,6 +45,10 @@ class SkbuildProjectGenerator:
 
         # Use venv instead of uv
         gen = SkbuildProjectGenerator("myext", "skbuild-pybind11", env_tool="venv")
+
+        # Use template overrides from a specific project directory
+        gen = SkbuildProjectGenerator("myext", "skbuild-pybind11",
+                                      project_dir=Path("/path/to/project"))
     """
 
     def __init__(
@@ -41,6 +57,7 @@ class SkbuildProjectGenerator:
         template_type: str,
         output_dir: Optional[Path] = None,
         env_tool: str = "uv",
+        project_dir: Optional[Path] = None,
     ):
         """Initialize the generator.
 
@@ -49,9 +66,11 @@ class SkbuildProjectGenerator:
             template_type: One of the SKBUILD_TYPES keys
             output_dir: Output directory (default: current directory / name)
             env_tool: Environment tool for Makefile ("uv" or "venv", default: "uv")
+            project_dir: Project directory for template overrides. If None,
+                         uses output_dir's parent for local override lookup.
         """
-        if template_type not in TEMPLATES:
-            valid = ", ".join(TEMPLATES.keys())
+        if template_type not in TEMPLATE_FILES:
+            valid = ", ".join(TEMPLATE_FILES.keys())
             raise ValueError(f"Invalid template type: {template_type}. Valid: {valid}")
 
         if not name.isidentifier():
@@ -67,18 +86,33 @@ class SkbuildProjectGenerator:
         self.template_type = template_type
         self.output_dir = Path(output_dir) if output_dir else Path.cwd() / name
         self.env_tool = env_tool
+        self.project_dir = project_dir
 
-        # Build templates dict with the appropriate Makefile
-        self.templates = dict(TEMPLATES[template_type])
-        self.templates["Makefile"] = MAKEFILE_BY_ENV[env_tool]
+        # Get resolved template paths (with override support)
+        self.resolved_templates = resolve_template_files(
+            template_type, env_tool, project_dir
+        )
 
-    def _format_path(self, path_template: str) -> Path:
-        """Format a path template with the project name."""
-        return self.output_dir / path_template.format(name=self.name)
+    def _render_path(self, path_template: str) -> Path:
+        """Render a path template with the project name.
 
-    def _format_content(self, content: str) -> str:
-        """Format content template with the project name."""
-        return content.format(name=self.name)
+        Converts ${name} in path to actual name.
+        """
+        # Use Mako to render the path (handles ${name} syntax)
+        rendered = Template(text=path_template).render(name=self.name)
+        return self.output_dir / rendered
+
+    def _render_template(self, template_path: Path) -> str:
+        """Load and render a template file.
+
+        Args:
+            template_path: Full path to template file.
+
+        Returns:
+            Rendered template content.
+        """
+        template = Template(filename=str(template_path))
+        return template.render(name=self.name)
 
     def generate(self) -> list[Path]:
         """Generate all project files.
@@ -88,9 +122,12 @@ class SkbuildProjectGenerator:
         """
         created_files = []
 
-        for path_template, content_template in self.templates.items():
-            file_path = self._format_path(path_template)
-            content = self._format_content(content_template)
+        for output_path_template, (
+            template_path,
+            source,
+        ) in self.resolved_templates.items():
+            file_path = self._render_path(output_path_template)
+            content = self._render_template(template_path)
 
             # Create parent directories
             file_path.parent.mkdir(parents=True, exist_ok=True)
@@ -104,6 +141,18 @@ class SkbuildProjectGenerator:
     def get_description(self) -> str:
         """Get description for this template type."""
         return SKBUILD_TYPES.get(self.template_type, "Unknown template type")
+
+    def get_template_sources(self) -> dict[str, str]:
+        """Get the source location for each template file.
+
+        Returns:
+            Dict mapping output filename to source label
+            ("env", "local", "global", or "built-in")
+        """
+        return {
+            output_path: source
+            for output_path, (_, source) in self.resolved_templates.items()
+        }
 
 
 def get_skbuild_types() -> dict[str, str]:
