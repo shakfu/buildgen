@@ -16,13 +16,13 @@ pip install buildgen
 
 ```bash
 # Create a C++ project
-buildgen project init -n myapp --recipe cpp/executable
+buildgen new myapp
 
 # Create a Python extension with pybind11
-buildgen project init -n myext --recipe py/pybind11
+buildgen new myext -r py/pybind11
 
 # List available recipes
-buildgen project recipes
+buildgen list
 ```
 
 ## Features
@@ -41,20 +41,23 @@ buildgen project recipes
 
 ```bash
 # Create projects from recipes
-buildgen project init -n myapp --recipe cpp/executable
-buildgen project init -n mylib --recipe c/static
-buildgen project init -n myext --recipe py/pybind11
-
-# Short form
-buildgen project init -n myapp -r cpp/full
+buildgen new myapp -r cpp/executable
+buildgen new mylib -r c/static
+buildgen new myext -r py/pybind11
 
 # List available recipes
-buildgen project recipes
+buildgen list
 
-# Direct Makefile generation
+# Generate build files from a config file
+buildgen generate --from project.json
+
+# Test recipe generation and building
+buildgen test --all
+
+# Direct Makefile generation (advanced)
 buildgen makefile generate -o Makefile --targets "all:main.o:"
 
-# Direct CMake generation
+# Direct CMake generation (advanced)
 buildgen cmake generate -o CMakeLists.txt --project myapp --cxx-standard 17
 ```
 
@@ -175,7 +178,7 @@ make CMAKE_FLAGS="-DFOO=bar"
 Recipes use a `category/variant` naming convention:
 
 ```bash
-buildgen project recipes
+buildgen list
 ```
 
 **C++ Recipes** (CMake + Makefile frontend):
@@ -217,10 +220,10 @@ Generate complete Python extension projects with scikit-build-core:
 
 ```bash
 # Create a pybind11 extension project
-buildgen project init -n myext --recipe py/pybind11
+buildgen new myext -r py/pybind11
 
 # Use traditional virtualenv instead of uv
-buildgen project init -n myext --recipe py/pybind11 --env venv
+buildgen new myext -r py/pybind11 --env venv
 ```
 
 This creates a complete project structure:
@@ -289,7 +292,7 @@ buildgen templates show py/pybind11
 
 3. Generate projects - your customizations will be used:
    ```bash
-   buildgen project init -n myext --recipe py/pybind11
+   buildgen new myext -r py/pybind11
    ```
 
 Templates use [Mako](https://www.makotemplates.org/) syntax with `${variable}` for substitution.

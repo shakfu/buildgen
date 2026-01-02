@@ -4,6 +4,45 @@ All notable changes to this project will be documented in this file.
 
 ## [unreleased]
 
+## [0.1.5]
+
+### BREAKING CHANGES
+
+- **CLI API Redesign** - The `project` command has been removed and replaced with simpler top-level commands:
+  - `buildgen project init -n <name> -r <recipe>` -> `buildgen new <name> -r <recipe>`
+  - `buildgen project recipes` -> `buildgen list`
+  - `buildgen project generate -c <file>` -> `buildgen generate --from <file>`
+
+### Added
+
+- **Simplified CLI API** - New top-level commands replacing verbose nested subcommands
+  - `buildgen new <name> [-r/--recipe]` - Create project from recipe (default: cpp/executable)
+  - `buildgen list [-c/--category]` - List available recipes
+  - `buildgen test [options]` - Test recipe generation and building
+  - `buildgen generate --config FILE` - Generate boilerplate config file
+  - `buildgen generate --from FILE` - Generate build files from existing config
+
+- **Recipe Testing Command** (`buildgen test`)
+  - `--name/-n` - Test specific recipe
+  - `--category/-c` - Test all recipes in category
+  - `--build/-b` - Build generated projects
+  - `--test/-t` - Run project tests
+  - `--all/-a` - Build and test (same as --build --test)
+  - `--keep/-k` - Keep output after testing
+  - `--output/-o` - Custom output directory
+
+- **pytest in Python Extension Templates** - All py/* templates now include pytest>=8.0 in dev dependencies
+
+### Changed
+
+- Removed legacy `project` command (use `new`, `list`, `generate` instead)
+- CLI examples in README updated to new simplified syntax
+
+### Fixed
+
+- **Cython template for scikit-build-core** - Replaced old scikit-build style (`find_package(Cython)`, `cython_transpile()`) with scikit-build-core compatible approach using `add_custom_command` and `Python::Interpreter -m cython`
+- **py/cext recipe framework** - Changed from `framework="cext"` to `framework="c"` to match skbuild-c template
+
 ## [0.1.4]
 
 ### Added

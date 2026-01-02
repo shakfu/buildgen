@@ -10,11 +10,9 @@ from buildgen.cmake.cli import add_cmake_subparsers
 from buildgen.common.project import ProjectConfig
 from buildgen.recipes import (
     RECIPES,
-    LEGACY_TYPE_MAPPING,
     get_recipe,
     get_recipes_by_category,
     is_valid_recipe,
-    resolve_recipe_name,
 )
 from buildgen.templates.resolver import (
     TemplateResolver,
@@ -22,48 +20,75 @@ from buildgen.templates.resolver import (
 )
 
 
-def cmd_project_generate(args: argparse.Namespace) -> None:
-    """Generate build files from project configuration."""
-    config = ProjectConfig.load(args.config)
-
-    outputs = []
-    if args.makefile or args.all:
-        makefile_path = args.makefile_output or "Makefile"
-        config.generate_makefile(makefile_path)
-        outputs.append(f"Makefile: {makefile_path}")
-
-    if args.cmake or args.all:
-        cmake_path = args.cmake_output or "CMakeLists.txt"
-        config.generate_cmake(cmake_path)
-        outputs.append(f"CMakeLists.txt: {cmake_path}")
-
-    if outputs:
-        print(f"Generated from {args.config}:")
-        for output in outputs:
-            print(f"  {output}")
-    else:
-        print("No output format specified. Use --makefile, --cmake, or --all")
+# =============================================================================
+# New simplified top-level commands
+# =============================================================================
 
 
-def cmd_project_types(args: argparse.Namespace) -> None:
-    """List available project build types (legacy, redirects to recipes)."""
-    cmd_project_recipes(args)
+def cmd_new(args: argparse.Namespace) -> None:
+    """Create a new project from a recipe."""
+    from buildgen.skbuild.generator import SkbuildProjectGenerator
+    from buildgen.cmake.project_generator import CMakeProjectGenerator, is_cmake_recipe
+
+    name = args.name
+    recipe_name = args.recipe or "cpp/executable"
+
+    # Validate recipe
+    if not is_valid_recipe(recipe_name):
+        print(f"Error: Unknown recipe '{recipe_name}'", file=sys.stderr)
+        print("\nUse 'buildgen list' to see available recipes.")
+        sys.exit(1)
+
+    recipe = get_recipe(recipe_name)
+
+    # Determine output directory
+    output_dir = Path(args.output) if args.output else Path(name)
+
+    # Handle scikit-build-core templates (py/* recipes)
+    if recipe.build_system == "skbuild":
+        skbuild_type = f"skbuild-{recipe.framework}"
+        env_tool = getattr(args, "env", "uv")
+        gen = SkbuildProjectGenerator(name, skbuild_type, output_dir, env_tool=env_tool)
+        created = gen.generate()
+        print(f"Created {recipe.name} project: {gen.output_dir}/")
+        print(f"  (using {env_tool} for Makefile commands)")
+        for path in created:
+            rel_path = path.relative_to(gen.output_dir)
+            print(f"  {rel_path}")
+        return
+
+    # Handle CMake-based templates (cpp/* and c/* recipes)
+    if is_cmake_recipe(recipe_name):
+        cmake_gen = CMakeProjectGenerator(name, recipe_name, output_dir)
+        created = cmake_gen.generate()
+        print(f"Created {recipe.name} project: {cmake_gen.output_dir}/")
+        for path in created:
+            rel_path = path.relative_to(cmake_gen.output_dir)
+            print(f"  {rel_path}")
+        return
+
+    print(f"Error: No generator available for recipe '{recipe_name}'", file=sys.stderr)
+    sys.exit(1)
 
 
-def cmd_project_recipes(args: argparse.Namespace) -> None:
-    """List available project recipes."""
+def cmd_list(args: argparse.Namespace) -> None:
+    """List available recipes."""
     categories = get_recipes_by_category()
 
-    # Category display names
     category_names = {
         "cpp": "C++ Recipes",
         "c": "C Recipes",
         "py": "Python Extension Recipes",
     }
 
+    # Filter by category if specified
+    category_filter = getattr(args, "category", None)
+
     print("Available recipes:\n")
     for category in ["cpp", "c", "py"]:
         if category not in categories:
+            continue
+        if category_filter and category != category_filter:
             continue
         print(f"{category_names.get(category, category)}:")
         for recipe in categories[category]:
@@ -71,7 +96,7 @@ def cmd_project_recipes(args: argparse.Namespace) -> None:
         print()
 
 
-def cmd_test_recipes(args: argparse.Namespace) -> None:
+def cmd_test(args: argparse.Namespace) -> None:
     """Test recipe generation and building."""
     import shutil
     import subprocess
@@ -114,18 +139,20 @@ def cmd_test_recipes(args: argparse.Namespace) -> None:
 
     for recipe_name in recipes_to_test:
         recipe = RECIPES[recipe_name]
-        # Create a valid Python identifier from recipe name
         project_name = recipe_name.replace("/", "_").replace("-", "_")
         project_dir = base_dir / project_name
 
-        result = {"generate": False, "build": False, "test": False, "error": None}
+        result: dict[str, bool | str | None] = {
+            "generate": False,
+            "build": False,
+            "test": False,
+            "error": None,
+        }
 
         try:
-            # Clean up existing directory
             if project_dir.exists():
                 shutil.rmtree(project_dir)
 
-            # Generate project
             if recipe.build_system == "skbuild":
                 skbuild_type = f"skbuild-{recipe.framework}"
                 gen = SkbuildProjectGenerator(
@@ -133,7 +160,9 @@ def cmd_test_recipes(args: argparse.Namespace) -> None:
                 )
                 gen.generate()
             elif is_cmake_recipe(recipe_name):
-                cmake_gen = CMakeProjectGenerator(project_name, recipe_name, project_dir)
+                cmake_gen = CMakeProjectGenerator(
+                    project_name, recipe_name, project_dir
+                )
                 cmake_gen.generate()
             else:
                 result["error"] = "No generator available"
@@ -142,10 +171,8 @@ def cmd_test_recipes(args: argparse.Namespace) -> None:
 
             result["generate"] = True
 
-            # Build project if requested
             if do_build:
                 if recipe.build_system == "skbuild":
-                    # Python extension: uv sync
                     proc = subprocess.run(
                         ["uv", "sync"],
                         cwd=project_dir,
@@ -156,9 +183,10 @@ def cmd_test_recipes(args: argparse.Namespace) -> None:
                     if proc.returncode == 0:
                         result["build"] = True
                     else:
-                        result["error"] = proc.stderr[:500] if proc.stderr else "Build failed"
+                        result["error"] = (
+                            proc.stderr[:500] if proc.stderr else "Build failed"
+                        )
                 else:
-                    # CMake project: make
                     proc = subprocess.run(
                         ["make"],
                         cwd=project_dir,
@@ -169,9 +197,10 @@ def cmd_test_recipes(args: argparse.Namespace) -> None:
                     if proc.returncode == 0:
                         result["build"] = True
                     else:
-                        result["error"] = proc.stderr[:500] if proc.stderr else "Build failed"
+                        result["error"] = (
+                            proc.stderr[:500] if proc.stderr else "Build failed"
+                        )
 
-                # Run tests if build succeeded and tests requested
                 if result["build"] and do_test:
                     if recipe.build_system == "skbuild":
                         proc = subprocess.run(
@@ -192,7 +221,9 @@ def cmd_test_recipes(args: argparse.Namespace) -> None:
                     if proc.returncode == 0:
                         result["test"] = True
                     else:
-                        result["error"] = proc.stderr[:500] if proc.stderr else "Tests failed"
+                        result["error"] = (
+                            proc.stderr[:500] if proc.stderr else "Tests failed"
+                        )
 
         except subprocess.TimeoutExpired:
             result["error"] = "Timeout"
@@ -201,7 +232,6 @@ def cmd_test_recipes(args: argparse.Namespace) -> None:
 
         results[recipe_name] = result
 
-        # Print progress
         status_parts = []
         if result["generate"]:
             status_parts.append("generated")
@@ -210,12 +240,12 @@ def cmd_test_recipes(args: argparse.Namespace) -> None:
         if result["test"]:
             status_parts.append("tested")
         if result["error"]:
-            status_parts.append(f"ERROR: {result['error'][:60]}")
+            err = str(result["error"])
+            status_parts.append(f"ERROR: {err[:60]}")
 
         status = ", ".join(status_parts) if status_parts else "failed"
         print(f"  {recipe_name:<25} {status}")
 
-    # Summary
     print("\n" + "=" * 60)
     total = len(results)
     generated = sum(1 for r in results.values() if r["generate"])
@@ -238,268 +268,267 @@ def cmd_test_recipes(args: argparse.Namespace) -> None:
     else:
         print(f"\nOutput preserved in {base_dir}")
 
-    # Exit with error if any failures
     if failed > 0:
         sys.exit(1)
 
 
-def cmd_project_init(args: argparse.Namespace) -> None:
-    """Create a project from a recipe template."""
-    from buildgen.skbuild.generator import SkbuildProjectGenerator
-    from buildgen.cmake.project_generator import CMakeProjectGenerator, is_cmake_recipe
+def cmd_generate(args: argparse.Namespace) -> None:
+    """Generate config file or build files."""
+    # Mode 1: Generate boilerplate config file
+    if args.config:
+        config_path = Path(args.config)
 
-    name = args.name or "myproject"
+        # Create a basic config template
+        if config_path.suffix in (".yaml", ".yml"):
+            content = """# buildgen project configuration
+name: myproject
+version: "0.1.0"
 
-    # Resolve recipe: prefer --recipe, fall back to --type with legacy mapping
-    recipe_name = getattr(args, "recipe", None)
-    if not recipe_name:
-        # Fall back to legacy --type option
-        legacy_type = getattr(args, "type", None)
-        if legacy_type:
-            recipe_name = resolve_recipe_name(legacy_type)
+# C++ standard (11, 14, 17, 20, 23)
+cxx_standard: 17
+
+# Compiler flags
+cflags: []
+cxxflags: []
+ldflags: []
+
+# Include directories
+include_dirs: []
+
+# Libraries to link
+ldlibs: []
+
+# Targets
+targets:
+  - name: myapp
+    type: executable
+    sources:
+      - src/main.cpp
+"""
         else:
-            # Default to cpp/executable if neither --recipe nor --type specified
-            recipe_name = "cpp/executable"
+            import json
 
-    # Validate and get recipe
-    if not is_valid_recipe(recipe_name):
-        print(f"Error: Unknown recipe '{recipe_name}'", file=sys.stderr)
-        print("\nUse 'buildgen project recipes' to list available recipes.")
-        sys.exit(1)
+            config_data = {
+                "name": "myproject",
+                "version": "0.1.0",
+                "cxx_standard": 17,
+                "cflags": [],
+                "cxxflags": [],
+                "ldflags": [],
+                "include_dirs": [],
+                "ldlibs": [],
+                "targets": [
+                    {
+                        "name": "myapp",
+                        "type": "executable",
+                        "sources": ["src/main.cpp"],
+                    }
+                ],
+            }
+            content = json.dumps(config_data, indent=2)
 
-    recipe = get_recipe(recipe_name)
-
-    # Determine output directory
-    if args.output == "project.json":
-        output_dir = Path(name)
-    else:
-        output_dir = Path(args.output)
-
-    # Handle scikit-build-core templates (py/* recipes)
-    if recipe.build_system == "skbuild":
-        # Map recipe variant to skbuild template type
-        skbuild_type = f"skbuild-{recipe.framework}"
-        env_tool = getattr(args, "env", "uv")
-        gen = SkbuildProjectGenerator(name, skbuild_type, output_dir, env_tool=env_tool)
-        created = gen.generate()
-        print(f"Created {recipe.name} project: {gen.output_dir}/")
-        print(f"  (using {env_tool} for Makefile commands)")
-        for path in created:
-            rel_path = path.relative_to(gen.output_dir)
-            print(f"  {rel_path}")
+        config_path.write_text(content)
+        print(f"Created config template: {config_path}")
         return
 
-    # Handle CMake-based templates (cpp/* and c/* recipes)
-    if is_cmake_recipe(recipe_name):
-        cmake_gen = CMakeProjectGenerator(name, recipe_name, output_dir)
-        created = cmake_gen.generate()
-        print(f"Created {recipe.name} project: {cmake_gen.output_dir}/")
-        for path in created:
-            rel_path = path.relative_to(cmake_gen.output_dir)
-            print(f"  {rel_path}")
+    # Mode 2: Generate build files from existing config
+    if args.from_config:
+        config = ProjectConfig.load(args.from_config)
+
+        # Default to --all if no output specified
+        do_makefile = args.makefile or (not args.cmake)
+        do_cmake = args.cmake or (not args.makefile)
+
+        outputs = []
+        if do_makefile:
+            makefile_path = "Makefile"
+            config.generate_makefile(makefile_path)
+            outputs.append(f"Makefile: {makefile_path}")
+
+        if do_cmake:
+            cmake_path = "CMakeLists.txt"
+            config.generate_cmake(cmake_path)
+            outputs.append(f"CMakeLists.txt: {cmake_path}")
+
+        print(f"Generated from {args.from_config}:")
+        for output in outputs:
+            print(f"  {output}")
         return
 
-    # Fallback: should not reach here for valid recipes
-    print(f"Error: No generator available for recipe '{recipe_name}'", file=sys.stderr)
+    # No mode specified
+    print("Error: Specify --config <file> or --from <file>", file=sys.stderr)
     sys.exit(1)
 
 
-def add_project_subparsers(subparsers: argparse._SubParsersAction) -> None:
-    """Add project subcommand parsers."""
-    project_parser = subparsers.add_parser(
-        "project",
-        help="Generate build files from project configuration (JSON/YAML)",
-    )
+# =============================================================================
+# Parser setup for new commands
+# =============================================================================
 
-    project_subparsers = project_parser.add_subparsers(
-        dest="project_command", help="Project commands"
-    )
 
-    # project generate
-    gen_parser = project_subparsers.add_parser(
-        "generate",
-        help="Generate Makefile and/or CMakeLists.txt from config",
-    )
-    gen_parser.add_argument(
-        "-c",
-        "--config",
-        required=True,
-        help="Path to project configuration file (JSON or YAML)",
-    )
-    gen_parser.add_argument(
-        "--makefile",
-        action="store_true",
-        help="Generate Makefile",
-    )
-    gen_parser.add_argument(
-        "--makefile-output",
-        default=None,
-        help="Output path for Makefile (default: Makefile)",
-    )
-    gen_parser.add_argument(
-        "--cmake",
-        action="store_true",
-        help="Generate CMakeLists.txt",
-    )
-    gen_parser.add_argument(
-        "--cmake-output",
-        default=None,
-        help="Output path for CMakeLists.txt (default: CMakeLists.txt)",
-    )
-    gen_parser.add_argument(
-        "--all",
-        action="store_true",
-        help="Generate both Makefile and CMakeLists.txt",
-    )
-    gen_parser.set_defaults(func=cmd_project_generate)
-
-    # project types (legacy, redirects to recipes)
-    types_parser = project_subparsers.add_parser(
-        "types",
-        help="List available project types (legacy, use 'recipes' instead)",
-    )
-    types_parser.set_defaults(func=cmd_project_types)
-
-    # project recipes
-    recipes_parser = project_subparsers.add_parser(
-        "recipes",
-        help="List available project recipes",
-    )
-    recipes_parser.set_defaults(func=cmd_project_recipes)
-
-    # Build valid choices for --type (legacy names) and --recipe (new names)
-    legacy_choices = list(LEGACY_TYPE_MAPPING.keys())
+def add_new_subparser(subparsers: argparse._SubParsersAction) -> None:
+    """Add 'new' command parser."""
     recipe_choices = list(RECIPES.keys())
 
-    # project init
-    init_parser = project_subparsers.add_parser(
-        "init",
-        help="Create a sample project configuration file",
+    parser = subparsers.add_parser(
+        "new",
+        help="Create a new project from a recipe",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  buildgen project init -n myapp --recipe cpp/executable
-  buildgen project init -n mylib --recipe c/static
-  buildgen project init -n myext --recipe py/pybind11
+  buildgen new myapp                          # Default recipe (cpp/executable)
+  buildgen new myapp -r cpp/executable        # Explicit recipe
+  buildgen new myext --recipe py/pybind11     # Python extension
+  buildgen new myext -r py/cython --env venv  # Use venv instead of uv
+  buildgen new mylib -r c/static -o /tmp/lib  # Custom output directory
 
-Use 'buildgen project recipes' to list available recipes.""",
+Use 'buildgen list' to see available recipes.""",
     )
-    init_parser.add_argument(
-        "-o",
-        "--output",
-        default="project.json",
-        help="Output path for configuration file (default: project.json)",
+    parser.add_argument(
+        "name",
+        help="Project name",
     )
-    init_parser.add_argument(
-        "-n",
-        "--name",
-        help="Project name (default: myproject)",
-    )
-    init_parser.add_argument(
+    parser.add_argument(
         "-r",
         "--recipe",
         choices=recipe_choices,
-        help="Project recipe (e.g., cpp/executable, py/pybind11)",
+        help="Recipe to use (default: cpp/executable)",
     )
-    init_parser.add_argument(
-        "-t",
-        "--type",
-        choices=legacy_choices,
-        help="(Legacy) Project type - use --recipe instead",
+    parser.add_argument(
+        "-o",
+        "--output",
+        help="Output directory (default: ./<name>)",
     )
-    init_parser.add_argument(
+    parser.add_argument(
         "-e",
         "--env",
         choices=["uv", "venv"],
         default="uv",
-        help="Environment tool for Makefile (py/* recipes only, default: uv)",
+        help="Environment tool for py/* recipes (default: uv)",
     )
-    init_parser.set_defaults(func=cmd_project_init)
+    parser.set_defaults(func=cmd_new)
 
 
-def add_test_subparsers(subparsers: argparse._SubParsersAction) -> None:
-    """Add test subcommand parsers."""
+def add_list_subparser(subparsers: argparse._SubParsersAction) -> None:
+    """Add 'list' command parser."""
+    parser = subparsers.add_parser(
+        "list",
+        help="List available recipes",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  buildgen list                 # List all recipes
+  buildgen list --category py   # List Python extension recipes
+  buildgen list -c cpp          # List C++ recipes""",
+    )
+    parser.add_argument(
+        "-c",
+        "--category",
+        choices=["cpp", "c", "py"],
+        help="Filter by category",
+    )
+    parser.set_defaults(func=cmd_list)
+
+
+def add_test_subparser(subparsers: argparse._SubParsersAction) -> None:
+    """Add 'test' command parser."""
     recipe_choices = list(RECIPES.keys())
 
-    test_parser = subparsers.add_parser(
+    parser = subparsers.add_parser(
         "test",
-        help="Test buildgen functionality",
-    )
-
-    test_subparsers = test_parser.add_subparsers(
-        dest="test_command", help="Test commands"
-    )
-
-    # test recipes
-    recipes_parser = test_subparsers.add_parser(
-        "recipes",
         help="Test recipe generation and building",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  # Test generation only (fast, no build)
-  buildgen test recipes
-
-  # Test generation and building
-  buildgen test recipes --build
-
-  # Test generation, building, and run tests
-  buildgen test recipes --build --test
-  buildgen test recipes --all
-
-  # Test only Python extension recipes
-  buildgen test recipes --category py --build
-  buildgen test recipes --category py --all
-
-  # Test a specific recipe
-  buildgen test recipes --name py/cython --build --test
-  buildgen test recipes --name py/cython --all
-
-  # Keep output for inspection
-  buildgen test recipes --build --keep -o /tmp/recipe-tests""",
+  buildgen test                           # Test generation only
+  buildgen test --build                   # Test generation and building
+  buildgen test --all                     # Build and run tests
+  buildgen test --category py --all       # Test Python recipes
+  buildgen test --name py/cython --all    # Test specific recipe
+  buildgen test --build --keep -o /tmp    # Keep output for inspection""",
     )
-    recipes_parser.add_argument(
+    parser.add_argument(
         "-n",
         "--name",
         choices=recipe_choices,
         help="Test only this recipe",
     )
-    recipes_parser.add_argument(
+    parser.add_argument(
         "-c",
         "--category",
         choices=["cpp", "c", "py"],
         help="Test only recipes in this category",
     )
-    recipes_parser.add_argument(
+    parser.add_argument(
         "-o",
         "--output",
         help="Output directory (default: temp directory)",
     )
-    recipes_parser.add_argument(
+    parser.add_argument(
         "-b",
         "--build",
         action="store_true",
         help="Build generated projects",
     )
-    recipes_parser.add_argument(
+    parser.add_argument(
         "-t",
         "--test",
         action="store_true",
         help="Run tests (requires --build)",
     )
-    recipes_parser.add_argument(
+    parser.add_argument(
         "-a",
         "--all",
         action="store_true",
         help="Build and test (shortcut for --build --test)",
     )
-    recipes_parser.add_argument(
+    parser.add_argument(
         "-k",
         "--keep",
         action="store_true",
         help="Keep output directory after testing",
     )
-    recipes_parser.set_defaults(func=cmd_test_recipes)
+    parser.set_defaults(func=cmd_test)
+
+
+def add_generate_subparser(subparsers: argparse._SubParsersAction) -> None:
+    """Add 'generate' command parser."""
+    parser = subparsers.add_parser(
+        "generate",
+        help="Generate config or build files",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  # Generate a boilerplate config file
+  buildgen generate --config project.json
+  buildgen generate --config project.yaml
+
+  # Generate build files from existing config
+  buildgen generate --from project.json
+  buildgen generate --from project.json --makefile
+  buildgen generate --from project.yaml --cmake""",
+    )
+    parser.add_argument(
+        "--config",
+        metavar="FILE",
+        help="Generate a boilerplate config file",
+    )
+    parser.add_argument(
+        "--from",
+        dest="from_config",
+        metavar="FILE",
+        help="Generate build files from existing config",
+    )
+    parser.add_argument(
+        "--makefile",
+        action="store_true",
+        help="Generate Makefile only (with --from)",
+    )
+    parser.add_argument(
+        "--cmake",
+        action="store_true",
+        help="Generate CMakeLists.txt only (with --from)",
+    )
+    parser.set_defaults(func=cmd_generate)
 
 
 def cmd_templates_list(args: argparse.Namespace) -> None:
@@ -698,28 +727,24 @@ def create_parser() -> argparse.ArgumentParser:
         description="Build system generator - Makefile, CMake, and more",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
+Common Commands:
+  new <name>            Create a new project from a recipe
+  list                  List available recipes
+  test                  Test recipe generation and building
+  generate              Generate config or build files
+
+Advanced Commands:
+  makefile              Direct Makefile generation
+  cmake                 Direct CMake generation
+  templates             Manage project templates
+
 Examples:
-  # Generate a Makefile
-  %(prog)s makefile generate -o Makefile \\
-    --include-dirs /usr/local/include --ldlibs pthread \\
-    --targets "all:main.o:" --phony all clean
-
-  # Direct compilation (Makefile-style)
-  %(prog)s makefile build myprogram --cppfiles main.cpp utils.cpp \\
-    --include-dirs /usr/local/include --ldlibs pthread
-
-  # Generate CMakeLists.txt
-  %(prog)s cmake generate -o CMakeLists.txt --project myproject \\
-    --cxx-standard 17 --executables "myapp:main.cpp utils.cpp"
-
-  # Build with CMake
-  %(prog)s cmake build -S . -B build --build-type Release
-
-  # Generate from project config (define once, generate both)
-  %(prog)s project init -o project.json
-  %(prog)s project generate -c project.json --all
-
-Note: Escape dollar signs with backslash when passing Makefile/CMake variables via CLI.
+  buildgen new myapp
+  buildgen new myext -r py/pybind11
+  buildgen list --category py
+  buildgen test --all
+  buildgen generate --config project.json
+  buildgen generate --from project.json
         """,
     )
 
@@ -729,20 +754,16 @@ Note: Escape dollar signs with backslash when passing Makefile/CMake variables v
 
     subparsers = parser.add_subparsers(dest="command", help="Available commands")
 
-    # Add makefile subcommands
+    # New simplified commands (Tier 1)
+    add_new_subparser(subparsers)
+    add_list_subparser(subparsers)
+    add_test_subparser(subparsers)
+    add_generate_subparser(subparsers)
+
+    # Advanced commands (Tier 3)
     add_makefile_subparsers(subparsers)
-
-    # Add cmake subcommands
     add_cmake_subparsers(subparsers)
-
-    # Add project subcommands
-    add_project_subparsers(subparsers)
-
-    # Add templates subcommands
     add_templates_subparsers(subparsers)
-
-    # Add test subcommands
-    add_test_subparsers(subparsers)
 
     return parser
 
@@ -755,6 +776,16 @@ def main() -> None:
     if not args.command:
         parser.print_help()
         sys.exit(1)
+
+    # Commands with direct func (new, list, test, generate)
+    if args.command in ("new", "list", "test", "generate"):
+        if hasattr(args, "func"):
+            try:
+                args.func(args)
+            except Exception as e:
+                print(f"Error: {e}", file=sys.stderr)
+                sys.exit(1)
+        return
 
     # Handle makefile subcommands
     if args.command == "makefile":
@@ -778,32 +809,10 @@ def main() -> None:
                 print(f"Error: {e}", file=sys.stderr)
                 sys.exit(1)
 
-    # Handle project subcommands
-    elif args.command == "project":
-        if not hasattr(args, "project_command") or not args.project_command:
-            parser.parse_args(["project", "--help"])
-        elif hasattr(args, "func"):
-            try:
-                args.func(args)
-            except Exception as e:
-                print(f"Error: {e}", file=sys.stderr)
-                sys.exit(1)
-
     # Handle templates subcommands
     elif args.command == "templates":
         if not hasattr(args, "templates_command") or not args.templates_command:
             parser.parse_args(["templates", "--help"])
-        elif hasattr(args, "func"):
-            try:
-                args.func(args)
-            except Exception as e:
-                print(f"Error: {e}", file=sys.stderr)
-                sys.exit(1)
-
-    # Handle test subcommands
-    elif args.command == "test":
-        if not hasattr(args, "test_command") or not args.test_command:
-            parser.parse_args(["test", "--help"])
         elif hasattr(args, "func"):
             try:
                 args.func(args)
