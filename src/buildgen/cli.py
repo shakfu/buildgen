@@ -71,6 +71,178 @@ def cmd_project_recipes(args: argparse.Namespace) -> None:
         print()
 
 
+def cmd_test_recipes(args: argparse.Namespace) -> None:
+    """Test recipe generation and building."""
+    import shutil
+    import subprocess
+    import tempfile
+
+    from buildgen.skbuild.generator import SkbuildProjectGenerator
+    from buildgen.cmake.project_generator import CMakeProjectGenerator, is_cmake_recipe
+
+    # Handle --all flag (shortcut for --build --test)
+    do_build = args.build or getattr(args, "all", False)
+    do_test = args.test or getattr(args, "all", False)
+
+    # Determine which recipes to test
+    recipes_to_test = []
+    if args.name:
+        if args.name not in RECIPES:
+            print(f"Error: Unknown recipe '{args.name}'", file=sys.stderr)
+            sys.exit(1)
+        recipes_to_test = [args.name]
+    elif args.category:
+        categories = get_recipes_by_category()
+        if args.category not in categories:
+            print(f"Error: Unknown category '{args.category}'", file=sys.stderr)
+            sys.exit(1)
+        recipes_to_test = [r.name for r in categories[args.category]]
+    else:
+        recipes_to_test = list(RECIPES.keys())
+
+    # Use provided output directory or create temp directory
+    if args.output:
+        base_dir = Path(args.output)
+        base_dir.mkdir(parents=True, exist_ok=True)
+        cleanup = False
+    else:
+        base_dir = Path(tempfile.mkdtemp(prefix="buildgen-test-"))
+        cleanup = not args.keep
+
+    results: dict[str, dict] = {}
+    print(f"Testing {len(recipes_to_test)} recipes in {base_dir}\n")
+
+    for recipe_name in recipes_to_test:
+        recipe = RECIPES[recipe_name]
+        # Create a valid Python identifier from recipe name
+        project_name = recipe_name.replace("/", "_").replace("-", "_")
+        project_dir = base_dir / project_name
+
+        result = {"generate": False, "build": False, "test": False, "error": None}
+
+        try:
+            # Clean up existing directory
+            if project_dir.exists():
+                shutil.rmtree(project_dir)
+
+            # Generate project
+            if recipe.build_system == "skbuild":
+                skbuild_type = f"skbuild-{recipe.framework}"
+                gen = SkbuildProjectGenerator(
+                    project_name, skbuild_type, project_dir, env_tool="uv"
+                )
+                gen.generate()
+            elif is_cmake_recipe(recipe_name):
+                cmake_gen = CMakeProjectGenerator(project_name, recipe_name, project_dir)
+                cmake_gen.generate()
+            else:
+                result["error"] = "No generator available"
+                results[recipe_name] = result
+                continue
+
+            result["generate"] = True
+
+            # Build project if requested
+            if do_build:
+                if recipe.build_system == "skbuild":
+                    # Python extension: uv sync
+                    proc = subprocess.run(
+                        ["uv", "sync"],
+                        cwd=project_dir,
+                        capture_output=True,
+                        text=True,
+                        timeout=300,
+                    )
+                    if proc.returncode == 0:
+                        result["build"] = True
+                    else:
+                        result["error"] = proc.stderr[:500] if proc.stderr else "Build failed"
+                else:
+                    # CMake project: make
+                    proc = subprocess.run(
+                        ["make"],
+                        cwd=project_dir,
+                        capture_output=True,
+                        text=True,
+                        timeout=120,
+                    )
+                    if proc.returncode == 0:
+                        result["build"] = True
+                    else:
+                        result["error"] = proc.stderr[:500] if proc.stderr else "Build failed"
+
+                # Run tests if build succeeded and tests requested
+                if result["build"] and do_test:
+                    if recipe.build_system == "skbuild":
+                        proc = subprocess.run(
+                            ["uv", "run", "pytest", "-v"],
+                            cwd=project_dir,
+                            capture_output=True,
+                            text=True,
+                            timeout=120,
+                        )
+                    else:
+                        proc = subprocess.run(
+                            ["make", "test"],
+                            cwd=project_dir,
+                            capture_output=True,
+                            text=True,
+                            timeout=120,
+                        )
+                    if proc.returncode == 0:
+                        result["test"] = True
+                    else:
+                        result["error"] = proc.stderr[:500] if proc.stderr else "Tests failed"
+
+        except subprocess.TimeoutExpired:
+            result["error"] = "Timeout"
+        except Exception as e:
+            result["error"] = str(e)[:500]
+
+        results[recipe_name] = result
+
+        # Print progress
+        status_parts = []
+        if result["generate"]:
+            status_parts.append("generated")
+        if result["build"]:
+            status_parts.append("built")
+        if result["test"]:
+            status_parts.append("tested")
+        if result["error"]:
+            status_parts.append(f"ERROR: {result['error'][:60]}")
+
+        status = ", ".join(status_parts) if status_parts else "failed"
+        print(f"  {recipe_name:<25} {status}")
+
+    # Summary
+    print("\n" + "=" * 60)
+    total = len(results)
+    generated = sum(1 for r in results.values() if r["generate"])
+    built = sum(1 for r in results.values() if r["build"])
+    tested = sum(1 for r in results.values() if r["test"])
+    failed = sum(1 for r in results.values() if r["error"])
+
+    print(f"Total: {total}, Generated: {generated}", end="")
+    if do_build:
+        print(f", Built: {built}", end="")
+    if do_test:
+        print(f", Tested: {tested}", end="")
+    if failed:
+        print(f", Failed: {failed}", end="")
+    print()
+
+    if cleanup:
+        shutil.rmtree(base_dir)
+        print(f"\nCleaned up {base_dir}")
+    else:
+        print(f"\nOutput preserved in {base_dir}")
+
+    # Exit with error if any failures
+    if failed > 0:
+        sys.exit(1)
+
+
 def cmd_project_init(args: argparse.Namespace) -> None:
     """Create a project from a recipe template."""
     from buildgen.skbuild.generator import SkbuildProjectGenerator
@@ -243,6 +415,91 @@ Use 'buildgen project recipes' to list available recipes.""",
         help="Environment tool for Makefile (py/* recipes only, default: uv)",
     )
     init_parser.set_defaults(func=cmd_project_init)
+
+
+def add_test_subparsers(subparsers: argparse._SubParsersAction) -> None:
+    """Add test subcommand parsers."""
+    recipe_choices = list(RECIPES.keys())
+
+    test_parser = subparsers.add_parser(
+        "test",
+        help="Test buildgen functionality",
+    )
+
+    test_subparsers = test_parser.add_subparsers(
+        dest="test_command", help="Test commands"
+    )
+
+    # test recipes
+    recipes_parser = test_subparsers.add_parser(
+        "recipes",
+        help="Test recipe generation and building",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  # Test generation only (fast, no build)
+  buildgen test recipes
+
+  # Test generation and building
+  buildgen test recipes --build
+
+  # Test generation, building, and run tests
+  buildgen test recipes --build --test
+  buildgen test recipes --all
+
+  # Test only Python extension recipes
+  buildgen test recipes --category py --build
+  buildgen test recipes --category py --all
+
+  # Test a specific recipe
+  buildgen test recipes --name py/cython --build --test
+  buildgen test recipes --name py/cython --all
+
+  # Keep output for inspection
+  buildgen test recipes --build --keep -o /tmp/recipe-tests""",
+    )
+    recipes_parser.add_argument(
+        "-n",
+        "--name",
+        choices=recipe_choices,
+        help="Test only this recipe",
+    )
+    recipes_parser.add_argument(
+        "-c",
+        "--category",
+        choices=["cpp", "c", "py"],
+        help="Test only recipes in this category",
+    )
+    recipes_parser.add_argument(
+        "-o",
+        "--output",
+        help="Output directory (default: temp directory)",
+    )
+    recipes_parser.add_argument(
+        "-b",
+        "--build",
+        action="store_true",
+        help="Build generated projects",
+    )
+    recipes_parser.add_argument(
+        "-t",
+        "--test",
+        action="store_true",
+        help="Run tests (requires --build)",
+    )
+    recipes_parser.add_argument(
+        "-a",
+        "--all",
+        action="store_true",
+        help="Build and test (shortcut for --build --test)",
+    )
+    recipes_parser.add_argument(
+        "-k",
+        "--keep",
+        action="store_true",
+        help="Keep output directory after testing",
+    )
+    recipes_parser.set_defaults(func=cmd_test_recipes)
 
 
 def cmd_templates_list(args: argparse.Namespace) -> None:
@@ -484,6 +741,9 @@ Note: Escape dollar signs with backslash when passing Makefile/CMake variables v
     # Add templates subcommands
     add_templates_subparsers(subparsers)
 
+    # Add test subcommands
+    add_test_subparsers(subparsers)
+
     return parser
 
 
@@ -533,6 +793,17 @@ def main() -> None:
     elif args.command == "templates":
         if not hasattr(args, "templates_command") or not args.templates_command:
             parser.parse_args(["templates", "--help"])
+        elif hasattr(args, "func"):
+            try:
+                args.func(args)
+            except Exception as e:
+                print(f"Error: {e}", file=sys.stderr)
+                sys.exit(1)
+
+    # Handle test subcommands
+    elif args.command == "test":
+        if not hasattr(args, "test_command") or not args.test_command:
+            parser.parse_args(["test", "--help"])
         elif hasattr(args, "func"):
             try:
                 args.func(args)

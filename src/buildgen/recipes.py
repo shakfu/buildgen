@@ -174,7 +174,7 @@ RECIPES: dict[str, Recipe] = {
         variant="cext",
         build_system="skbuild",
         language="c",
-        framework="cext",
+        framework="c",
     ),
 }
 

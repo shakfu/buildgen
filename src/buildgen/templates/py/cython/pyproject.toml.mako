@@ -10,3 +10,6 @@ requires-python = ">=3.9"
 
 [tool.scikit-build]
 wheel.packages = ["src/${name}"]
+
+[dependency-groups]
+dev = ["pytest>=8.0"]
