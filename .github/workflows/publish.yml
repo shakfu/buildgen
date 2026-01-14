@@ -15,17 +15,7 @@ jobs:
         persist-credentials: false
 
     - name: Install uv and set Python version
-      # Use the official action from astral-sh
       uses: astral-sh/setup-uv@v7
-      with:
-        python-version: '3.x'
-        # Enable caching of installed packages
-        enable-cache: true
-        # Define files that control the cache key (e.g., requirements files or pyproject.toml)
-        cache-dependency-glob: |
-          **/*requirements*.txt
-          **/pyproject.toml
-          **/uv.lock
 
     - name: Install dependencies
       # This command installs dependencies listed in your project configuration
