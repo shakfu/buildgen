@@ -1,7 +1,7 @@
-name: Publish buildgen to PyPI
+name: Publish to PyPI
 
-on: [workflow_dispatch]
-# on: push
+# on: [workflow_dispatch]
+on: push
 
 jobs:
   build:
@@ -18,11 +18,9 @@ jobs:
       uses: astral-sh/setup-uv@v7
 
     - name: Install dependencies
-      # This command installs dependencies listed in your project configuration
       run: uv sync
 
     - name: Run checks
-      # This command installs dependencies listed in your project configuration
       run: make fullcheck
 
     - name: Build a binary wheel and a source tarball
@@ -42,7 +40,7 @@ jobs:
     runs-on: ubuntu-latest
     environment:
       name: pypi
-      url: https://pypi.org/p/buildgen  # Replace <package-name> with your PyPI project name
+      url: https://pypi.org/p/buildgen
     permissions:
       id-token: write  # IMPORTANT: mandatory for trusted publishing
 
@@ -54,27 +52,3 @@ jobs:
         path: dist/
     - name: Publish distributionto PyPI
       uses: pypa/gh-action-pypi-publish@release/v1
-
-  # publish-to-testpypi:
-  #   name: Publish Python distribution to TestPyPI
-  #   needs:
-  #   - build
-  #   runs-on: ubuntu-latest
-
-  #   environment:
-  #     name: testpypi
-  #     url: https://test.pypi.org/p/buildgen
-
-  #   permissions:
-  #     id-token: write  # IMPORTANT: mandatory for trusted publishing
-
-  #   steps:
-  #   - name: Download all the dists
-  #     uses: actions/download-artifact@v6
-  #     with:
-  #       name: python-package-distributions
-  #       path: dist/
-  #   - name: Publish distribution to TestPyPI
-  #     uses: pypa/gh-action-pypi-publish@release/v1
-  #     with:
-  #       repository-url: https://test.pypi.org/legacy/
