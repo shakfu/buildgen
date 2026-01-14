@@ -1,6 +1,6 @@
-# buildgen
+# buildgen - generate your build-system
 
-A zero-dependency[^1] build system generator package supporting Makefile, CMake, and cross-generator project definitions.
+A zero-dependency[^1] build system generator package supporting Makefile, CMake, and [scikit-build-core](https://github.com/scikit-build/scikit-build-core) project definitions.
 
 Originally inspired by prior work on `shedskin.makefile` in the [shedskin project](https://github.com/shedskin/shedskin).
 
@@ -8,8 +8,16 @@ Originally inspired by prior work on `shedskin.makefile` in the [shedskin projec
 
 ## Installation
 
+The base installation get's you all features and JSON-based project configuration.
+
 ```bash
 pip install buildgen
+```
+
+If you want to have YAML-based project configuration then
+
+```bash
+pip install buildgen[yaml]
 ```
 
 ## Quick Start
@@ -171,6 +179,44 @@ make CMAKE_FLAGS="-DFOO=bar"
         }
     ]
 }
+```
+
+### YAML format
+
+```yaml
+name: myproject
+version: 1.0.0
+cxx_standard: 17
+
+compile_options:
+  - -Wall
+  - -Wextra
+
+dependencies:
+  - Threads
+  - name: OpenSSL
+    required: true
+  - name: fmt
+    git_repository: https://github.com/fmtlib/fmt.git
+    git_tag: 10.1.1
+
+targets:
+  - name: mylib
+    type: static
+    sources:
+      - src/lib.cpp
+    include_dirs:
+      - include
+    install: true
+
+  - name: myapp
+    type: executable
+    sources:
+      - src/main.cpp
+    link_libraries:
+      - mylib
+      - Threads::Threads
+    install: true
 ```
 
 ### Project Recipes
