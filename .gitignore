@@ -211,6 +211,7 @@ __marimo__/
 # claude
 .claude
 CLAUDE.md
+AGENTS.md
 
 # uv
 uv.lock
