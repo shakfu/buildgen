@@ -1,23 +1,13 @@
 # buildgen - generate your build-system
 
-A zero-dependency[^1] build system generator package supporting Makefile, CMake, and [scikit-build-core](https://github.com/scikit-build/scikit-build-core) project definitions.
+A build system generator package supporting Makefile, CMake, and [scikit-build-core](https://github.com/scikit-build/scikit-build-core) project definitions.
 
 Originally inspired by prior work on `shedskin.makefile` in the [shedskin project](https://github.com/shedskin/shedskin).
 
-[^1]: uses an embedded *lite* version of [Mako Templates](https://www.makotemplates.org/)
-
 ## Installation
-
-The base installation get's you all features and JSON-based project configuration.
 
 ```bash
 pip install buildgen
-```
-
-If you want to have YAML-based project configuration then
-
-```bash
-pip install buildgen[yaml]
 ```
 
 ## Quick Start
@@ -37,11 +27,12 @@ buildgen list
 
 - **Makefile Generation**: Programmatic Makefile creation with variables, pattern rules, conditionals
 - **CMake Generation**: Full CMakeLists.txt generation with find_package, FetchContent, install rules
-- **Cross-Generator**: Define project once in JSON/YAML, generate both build systems
+- **Cross-Generator**: Define project recipes once in JSON/YAML, generate build systems
 - **CMake Frontend**: Use CMake as build system with convenient Makefile frontend
 - **Project Templates**: Quick-start templates for common project types
 - **scikit-build-core Templates**: Python extension project scaffolding (pybind11, cython, nanobind, C)
 - **Template Customization**: Override templates per-project, per-user, or via environment variable (Mako syntax)
+- **Configurable Project Recipes**: 2-step JSON/YAML recipes which include options and which are `rendered` to generate the project infrastructure.
 
 ## Usage
 
@@ -256,6 +247,7 @@ buildgen list
 | Recipe | Description |
 |--------|-------------|
 | `py/pybind11` | C++ extension using pybind11 |
+| `py/pybind11-flex` | Pybind11 extension with optional Catch2/GTest tests + CLI |
 | `py/nanobind` | C++ extension using nanobind |
 | `py/cython` | Extension using Cython |
 | `py/cext` | C extension (Python.h) |
@@ -297,6 +289,29 @@ make clean    # Remove build artifacts
 ```
 
 For traditional virtualenv workflows, use `--env venv` to generate pip/python commands instead.
+
+The `py/pybind11-flex` recipe additionally drops a `project.flex.json` that documents
+how to toggle the native Catch2/GTest harness and the optional embedded CLI using
+`cmake -D` flags. Update its `options` block and rerun `cmake` to explore
+different combinations without re-running `buildgen new`.
+
+### Configurable Recipe Workflow
+
+For recipes marked as configurable (like `py/pybind11-flex`), project creation is a
+two-step flow:
+
+```bash
+buildgen new myflex -r py/pybind11-flex      # emits myflex/project.flex.json
+# edit myflex/project.flex.json (env, test framework, CLI toggle)
+buildgen render myflex/project.flex.json     # renders full project based on options
+```
+
+`buildgen render` produces a standard config (`project.json` or `.yaml`, depending on the
+source filename) inside the generated project with all placeholders resolved, while the
+original `project.flex.json` stays wherever you edited it for future re-runs. You can run
+`buildgen render` from within the project directory as long as you point to the flex file.
+Use `--env venv` on `buildgen render` to override the config’s environment choice without
+editing the JSON/YAML.
 
 ## Template Customization
 

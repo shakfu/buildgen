@@ -159,7 +159,7 @@ class ProjectConfig:
         Requires pyyaml to be installed.
         """
         try:
-            import yaml  # type: ignore[import-not-found,import-untyped]
+            import yaml
         except ImportError:
             raise ImportError(
                 "pyyaml is required for YAML support. Install with: pip install pyyaml"
@@ -244,7 +244,7 @@ class ProjectConfig:
         Requires pyyaml to be installed.
         """
         try:
-            import yaml  # type: ignore[import-not-found,import-untyped]
+            import yaml
         except ImportError:
             raise ImportError(
                 "pyyaml is required for YAML support. Install with: pip install pyyaml"

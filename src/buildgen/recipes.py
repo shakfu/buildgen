@@ -6,8 +6,8 @@ Recipes use a `category/variant` naming convention:
 - py/pybind11, py/nanobind, py/cython, py/cext
 """
 
-from dataclasses import dataclass
-from typing import Optional
+from dataclasses import dataclass, field
+from typing import Optional, Any
 
 
 @dataclass
@@ -21,6 +21,9 @@ class Recipe:
     build_system: str  # "cmake" or "skbuild"
     language: str  # "c", "cpp", "cython"
     framework: Optional[str] = None  # "pybind11", "nanobind", etc.
+    configurable: bool = False
+    config_template: Optional[str] = None
+    default_options: dict[str, Any] = field(default_factory=dict)
 
 
 # Recipe registry with category/variant naming
@@ -148,6 +151,22 @@ RECIPES: dict[str, Recipe] = {
         build_system="skbuild",
         language="cpp",
         framework="pybind11",
+    ),
+    "py/pybind11-flex": Recipe(
+        name="py/pybind11-flex",
+        description="Pybind11 extension with configurable native extras",
+        category="py",
+        variant="pybind11-flex",
+        build_system="skbuild",
+        language="cpp",
+        framework="pybind11-flex",
+        configurable=True,
+        config_template="project.flex.json.mako",
+        default_options={
+            "env": "uv",
+            "test_framework": "catch2",
+            "build_examples": False,
+        },
     ),
     "py/nanobind": Recipe(
         name="py/nanobind",

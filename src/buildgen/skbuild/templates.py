@@ -9,7 +9,7 @@ Template paths use recipe naming: py/pybind11, py/cython, py/cext, py/nanobind
 from pathlib import Path
 from typing import Optional
 
-from buildgen._mako.template import Template
+from mako.template import Template
 from buildgen.templates.resolver import BUILTIN_TEMPLATES_DIR, TemplateResolver
 
 # Path to templates directory (built-in)
@@ -19,6 +19,7 @@ TEMPLATES_DIR = BUILTIN_TEMPLATES_DIR
 # Maps legacy names to descriptions
 SKBUILD_TYPES = {
     "skbuild-pybind11": "Python extension using pybind11 (C++ bindings)",
+    "skbuild-pybind11-flex": "Pybind11 extension with configurable native extras",
     "skbuild-cython": "Python extension using Cython",
     "skbuild-c": "Python C extension (direct Python.h)",
     "skbuild-nanobind": "Python extension using nanobind (modern C++ bindings)",
@@ -27,6 +28,7 @@ SKBUILD_TYPES = {
 # Map legacy type names to recipe template paths
 LEGACY_TO_RECIPE_PATH = {
     "skbuild-pybind11": "py/pybind11",
+    "skbuild-pybind11-flex": "py/pybind11-flex",
     "skbuild-cython": "py/cython",
     "skbuild-c": "py/cext",
     "skbuild-nanobind": "py/nanobind",
@@ -43,6 +45,18 @@ TEMPLATE_FILES = {
         "src/${name}/__init__.py": "src/__init__.py.mako",
         "src/${name}/_core.cpp": "src/_core.cpp.mako",
         "tests/test_${name}.py": "tests/test.py.mako",
+    },
+    "skbuild-pybind11-flex": {
+        "Makefile": "common/Makefile.{env}.mako",
+        "pyproject.toml": "pyproject.toml.mako",
+        "CMakeLists.txt": "CMakeLists.txt.mako",
+        "project.flex.json": "project.flex.json.mako",
+        "src/${name}/__init__.py": "src/__init__.py.mako",
+        "src/${name}/_core.cpp": "src/_core.cpp.mako",
+        "examples/cli/main.cpp": "examples/cli/main.cpp.mako",
+        "tests/test_${name}.py": "tests/test.py.mako",
+        "tests/native/test_module.catch2.cpp": "tests/native/test_module.catch2.cpp.mako",
+        "tests/native/test_module.gtest.cpp": "tests/native/test_module.gtest.cpp.mako",
     },
     "skbuild-cython": {
         "Makefile": "common/Makefile.{env}.mako",

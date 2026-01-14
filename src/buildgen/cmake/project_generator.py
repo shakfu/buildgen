@@ -6,7 +6,7 @@ Generates C/C++ projects from templates in templates/cpp/* and templates/c/*.
 from pathlib import Path
 from typing import Optional
 
-from buildgen._mako.template import Template
+from mako.template import Template
 from buildgen.templates.resolver import TemplateResolver
 
 

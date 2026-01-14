@@ -1,9 +1,9 @@
 """scikit-build-core project generator."""
 
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Any, Dict
 
-from buildgen._mako.template import Template
+from mako.template import Template
 from buildgen.skbuild.templates import (
     SKBUILD_TYPES,
     TEMPLATE_FILES,
@@ -58,6 +58,7 @@ class SkbuildProjectGenerator:
         output_dir: Optional[Path] = None,
         env_tool: str = "uv",
         project_dir: Optional[Path] = None,
+        context: Optional[dict[str, Any]] = None,
     ):
         """Initialize the generator.
 
@@ -87,6 +88,9 @@ class SkbuildProjectGenerator:
         self.output_dir = Path(output_dir) if output_dir else Path.cwd() / name
         self.env_tool = env_tool
         self.project_dir = project_dir
+        self.context: Dict[str, Any] = dict(context or {})
+        if "options" not in self.context:
+            self.context["options"] = {}
 
         # Get resolved template paths (with override support)
         self.resolved_templates = resolve_template_files(
@@ -112,7 +116,10 @@ class SkbuildProjectGenerator:
             Rendered template content.
         """
         template = Template(filename=str(template_path))
-        return template.render(name=self.name)
+        render_args = {"name": self.name}
+        if self.context:
+            render_args.update(self.context)
+        return template.render(**render_args)
 
     def generate(self) -> list[Path]:
         """Generate all project files.

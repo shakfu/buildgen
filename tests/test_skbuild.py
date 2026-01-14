@@ -1,5 +1,7 @@
 """Tests for scikit-build-core project generation."""
 
+import argparse
+
 import pytest
 
 from buildgen.skbuild.generator import (
@@ -8,6 +10,7 @@ from buildgen.skbuild.generator import (
     is_skbuild_type,
 )
 from buildgen.skbuild.templates import TEMPLATE_FILES, SKBUILD_TYPES
+from buildgen.cli import cmd_new, cmd_render
 
 
 class TestSkbuildTypes:
@@ -17,14 +20,16 @@ class TestSkbuildTypes:
         """Test get_skbuild_types returns all types."""
         types = get_skbuild_types()
         assert "skbuild-pybind11" in types
+        assert "skbuild-pybind11-flex" in types
         assert "skbuild-cython" in types
         assert "skbuild-c" in types
         assert "skbuild-nanobind" in types
-        assert len(types) == 4
+        assert len(types) == 5
 
     def test_is_skbuild_type(self):
         """Test is_skbuild_type detection."""
         assert is_skbuild_type("skbuild-pybind11")
+        assert is_skbuild_type("skbuild-pybind11-flex")
         assert is_skbuild_type("skbuild-cython")
         assert is_skbuild_type("skbuild-c")
         assert is_skbuild_type("skbuild-nanobind")
@@ -65,8 +70,8 @@ class TestTemplates:
     def test_templates_have_test_file(self):
         """Test all templates include test file."""
         for template_type, files in TEMPLATE_FILES.items():
-            test_files = [f for f in files if "test_" in f or "/test." in f]
-            assert len(test_files) == 1, f"{template_type} should have test file"
+            test_files = [f for f in files if f.startswith("tests/")]
+            assert test_files, f"{template_type} should have at least one test file"
 
 
 class TestSkbuildProjectGenerator:
@@ -188,6 +193,109 @@ class TestPybind11Generation:
         content = (output_dir / "src/myext/__init__.py").read_text()
         assert "from myext._core import add, greet" in content
         assert '__version__ = "0.1.0"' in content
+
+
+class TestPybind11FlexGeneration:
+    """Test pybind11-flex project generation."""
+
+    @pytest.fixture
+    def output_dir(self, tmp_path):
+        """Temporary output directory."""
+        return tmp_path / "flexext"
+
+    def test_generates_configurable_files(self, output_dir):
+        """Test that all expected files exist."""
+        gen = SkbuildProjectGenerator("flexext", "skbuild-pybind11-flex", output_dir)
+        created = gen.generate()
+
+        expected = {
+            output_dir / "Makefile",
+            output_dir / "pyproject.toml",
+            output_dir / "CMakeLists.txt",
+            output_dir / "project.flex.json",
+            output_dir / "src/flexext/__init__.py",
+            output_dir / "src/flexext/_core.cpp",
+            output_dir / "examples/cli/main.cpp",
+            output_dir / "tests/test_flexext.py",
+            output_dir / "tests/native/test_module.catch2.cpp",
+            output_dir / "tests/native/test_module.gtest.cpp",
+        }
+        assert expected.issubset(set(created))
+
+    def test_cmake_content_has_options(self, output_dir):
+        """Test that CMakeLists.txt exposes configuration toggles."""
+        gen = SkbuildProjectGenerator("flexext", "skbuild-pybind11-flex", output_dir)
+        gen.generate()
+        content = (output_dir / "CMakeLists.txt").read_text()
+        assert "BUILD_CPP_TESTS" in content
+        assert "TEST_FRAMEWORK" in content
+        assert "BUILD_EMBEDDED_CLI" in content
+        assert "FetchContent_Declare" in content
+
+    def test_project_config_mentions_options(self, output_dir):
+        """Ensure the config example documents options."""
+        gen = SkbuildProjectGenerator("flexext", "skbuild-pybind11-flex", output_dir)
+        gen.generate()
+        content = (output_dir / "project.flex.json").read_text()
+        assert '"options"' in content
+        assert '"test_framework"' in content
+        assert '"cmake_options"' in content
+
+
+class TestConfigurableWorkflow:
+    """End-to-end configurable recipe workflow."""
+
+    def test_new_emits_config_only(self, tmp_path):
+        """buildgen new should only create config for configurable recipes."""
+        project_dir = tmp_path / "flexcfg"
+        args = argparse.Namespace(
+            name="flexcfg", recipe="py/pybind11-flex", output=str(project_dir), env="uv"
+        )
+        cmd_new(args)
+
+        config_path = project_dir / "project.flex.json"
+        assert config_path.exists()
+        assert not (project_dir / "CMakeLists.txt").exists()
+
+    def test_render_respects_options(self, tmp_path):
+        """buildgen render should honor edited options."""
+        config_dir = tmp_path / "flexrender"
+        args = argparse.Namespace(
+            name="flexproj",
+            recipe="py/pybind11-flex",
+            output=str(config_dir),
+            env="uv",
+        )
+        cmd_new(args)
+        config_path = config_dir / "project.flex.json"
+
+        text = config_path.read_text()
+        text = text.replace('"test_framework": "catch2"', '"test_framework": "gtest"')
+        text = text.replace('"build_examples": false', '"build_examples": true')
+        text = text.replace('"env": "uv"', '"env": "venv"')
+        config_path.write_text(text)
+
+        output_dir = tmp_path / "rendered"
+        render_args = argparse.Namespace(
+            config=str(config_path), output=str(output_dir), env=None
+        )
+        cmd_render(render_args)
+
+        pyproject = (output_dir / "pyproject.toml").read_text()
+        assert 'TEST_FRAMEWORK = "gtest"' in pyproject
+        assert "BUILD_EMBEDDED_CLI = true" in pyproject
+
+        cmake = (output_dir / "CMakeLists.txt").read_text()
+        assert 'set(TEST_FRAMEWORK "gtest"' in cmake
+
+        makefile = (output_dir / "Makefile").read_text()
+        assert "PIP ?= pip" in makefile  # indicates venv Makefile
+        assert "UV" not in makefile
+
+        assert (output_dir / "examples/cli/main.cpp").exists()
+        rendered_config = (output_dir / "project.json").read_text()
+        assert "<options" not in rendered_config
+        assert "-DTEST_FRAMEWORK=gtest" in rendered_config
 
 
 class TestCythonGeneration:

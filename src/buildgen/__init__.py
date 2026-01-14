@@ -10,7 +10,7 @@ For additional components, import from submodules:
     from buildgen.common.project import TargetConfig, DependencyConfig
 """
 
-__version__ = "0.1.5"
+__version__ = "0.1.6"
 
 # Core API - minimal exports for early development flexibility
 from buildgen.common.project import ProjectConfig

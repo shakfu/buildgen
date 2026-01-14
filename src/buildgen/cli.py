@@ -1,8 +1,15 @@
 """Unified CLI entry point for buildgen."""
 
 import argparse
+import copy
+import json
+import re
+import shutil
 import sys
 from pathlib import Path
+from typing import Any, Optional
+
+from mako.template import Template
 
 from buildgen import __version__
 from buildgen.makefile.cli import add_makefile_subparsers
@@ -10,6 +17,7 @@ from buildgen.cmake.cli import add_cmake_subparsers
 from buildgen.common.project import ProjectConfig
 from buildgen.recipes import (
     RECIPES,
+    Recipe,
     get_recipe,
     get_recipes_by_category,
     is_valid_recipe,
@@ -44,6 +52,11 @@ def cmd_new(args: argparse.Namespace) -> None:
     # Determine output directory
     output_dir = Path(args.output) if args.output else Path(name)
 
+    # Configurable recipes emit config first
+    if recipe.configurable:
+        _generate_config_file(recipe, name, output_dir)
+        return
+
     # Handle scikit-build-core templates (py/* recipes)
     if recipe.build_system == "skbuild":
         skbuild_type = f"skbuild-{recipe.framework}"
@@ -69,6 +82,39 @@ def cmd_new(args: argparse.Namespace) -> None:
 
     print(f"Error: No generator available for recipe '{recipe_name}'", file=sys.stderr)
     sys.exit(1)
+
+
+def _generate_config_file(
+    recipe: "Recipe",
+    name: str,
+    output_dir: Path,
+    *,
+    options: Optional[dict[str, Any]] = None,
+) -> None:
+    """Render the config template for configurable recipes."""
+    if not recipe.config_template:
+        raise ValueError(
+            f"Recipe {recipe.name} is marked configurable but lacks config_template"
+        )
+
+    output_dir.mkdir(parents=True, exist_ok=True)
+    resolver = TemplateResolver(output_dir)
+    template_path, _ = resolver.resolve(recipe.name, recipe.config_template)
+    template = Template(filename=str(template_path))
+
+    base_options = dict(recipe.default_options)
+    if options:
+        base_options.update(options)
+
+    content = template.render(name=name, options=base_options)
+    config_filename = Path(recipe.config_template).with_suffix("")
+    config_path = output_dir / config_filename
+    config_path.write_text(content)
+
+    print(f"Created configurable recipe skeleton at {output_dir}/")
+    print(f"  {config_filename}")
+    print("Edit the options block, then run:")
+    print(f"  buildgen render {config_path}")
 
 
 def cmd_list(args: argparse.Namespace) -> None:
@@ -98,7 +144,6 @@ def cmd_list(args: argparse.Namespace) -> None:
 
 def cmd_test(args: argparse.Namespace) -> None:
     """Test recipe generation and building."""
-    import shutil
     import subprocess
     import tempfile
 
@@ -360,6 +405,193 @@ targets:
     sys.exit(1)
 
 
+def cmd_render(args: argparse.Namespace) -> None:
+    """Render a configurable recipe config into a full project."""
+    from buildgen.skbuild.generator import SkbuildProjectGenerator, ENV_TOOLS
+
+    config_path = Path(args.config)
+    if not config_path.exists():
+        print(f"Error: Config file not found: {config_path}", file=sys.stderr)
+        sys.exit(1)
+
+    data = _load_configurable_config(config_path)
+
+    recipe_name = data.get("recipe")
+    if not recipe_name:
+        print("Error: Config file must include 'recipe'", file=sys.stderr)
+        sys.exit(1)
+
+    if not is_valid_recipe(recipe_name):
+        print(f"Error: Unknown recipe '{recipe_name}'", file=sys.stderr)
+        sys.exit(1)
+
+    recipe = get_recipe(recipe_name)
+    if not recipe.configurable:
+        print(
+            f"Error: Recipe '{recipe_name}' is not a configurable recipe. "
+            "Use 'buildgen new' directly.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+    project_name = data.get("name")
+    if not project_name:
+        print("Error: Config file must include 'name'", file=sys.stderr)
+        sys.exit(1)
+
+    output_dir = Path(args.output) if args.output else config_path.parent / project_name
+    options = _prepare_recipe_options(
+        recipe, data.get("options", {}), override_env=getattr(args, "env", None)
+    )
+
+    env_tool = options.get("env", "uv")
+    if env_tool not in ENV_TOOLS:
+        valid = ", ".join(ENV_TOOLS)
+        print(
+            f"Error: Invalid env option '{env_tool}'. Valid: {valid}", file=sys.stderr
+        )
+        sys.exit(1)
+
+    skbuild_type = f"skbuild-{recipe.framework}"
+    output_dir.mkdir(parents=True, exist_ok=True)
+    gen = SkbuildProjectGenerator(
+        project_name,
+        skbuild_type,
+        output_dir,
+        env_tool=env_tool,
+        context={"options": options},
+    )
+    created = gen.generate()
+
+    generated_flex = output_dir / config_path.name
+    if generated_flex.exists():
+        generated_flex.unlink()
+        created = [p for p in created if p != generated_flex]
+
+    plain_config = _create_plain_config(data, options)
+    output_config_name = _determine_plain_config_name(config_path.name)
+    output_config = output_dir / output_config_name
+    _write_plain_config(output_config, plain_config)
+    created.append(output_config)
+
+    print(f"Rendered {recipe.name} to {output_dir}/")
+    for path in created:
+        rel_path = path.relative_to(output_dir)
+        print(f"  {rel_path}")
+
+
+def _load_configurable_config(path: Path) -> dict[str, Any]:
+    """Load configurable recipe config file (YAML or JSON)."""
+    ext = path.suffix.lower()
+
+    def _load_yaml() -> dict[str, Any]:
+        try:
+            import yaml
+        except ImportError as exc:
+            raise RuntimeError(
+                "pyyaml is required for YAML configs. Install with 'pip install pyyaml'."
+            ) from exc
+
+        with path.open("r", encoding="utf-8") as handle:
+            data = yaml.safe_load(handle)
+        if not isinstance(data, dict):
+            raise ValueError("YAML config must be a mapping at the top level")
+        return data
+
+    def _load_json() -> dict[str, Any]:
+        with path.open("r", encoding="utf-8") as handle:
+            data = json.load(handle)
+        if not isinstance(data, dict):
+            raise ValueError("JSON config must be a mapping at the top level")
+        return data
+
+    if ext in (".yaml", ".yml"):
+        return _load_yaml()
+    if ext == ".json":
+        return _load_json()
+
+    # Try JSON first, then YAML for unknown extensions
+    try:
+        return _load_json()
+    except Exception:
+        return _load_yaml()
+
+
+def _prepare_recipe_options(
+    recipe: Recipe,
+    config_options: Optional[dict[str, Any]],
+    *,
+    override_env: Optional[str] = None,
+) -> dict[str, Any]:
+    """Merge recipe default options with overrides."""
+    options = dict(recipe.default_options)
+    if config_options:
+        options.update(config_options)
+    if override_env:
+        options["env"] = override_env
+    return options
+
+
+def _determine_plain_config_name(source_name: str) -> str:
+    """Convert project.flex.* filename to plain project.*."""
+    if ".flex." in source_name:
+        return source_name.replace(".flex.", ".", 1)
+    return source_name
+
+
+def _resolve_option_tokens(value: Any, options: dict[str, Any]) -> Any:
+    """Replace <options.foo> placeholders with actual option values."""
+    if isinstance(value, dict):
+        return {k: _resolve_option_tokens(v, options) for k, v in value.items()}
+    if isinstance(value, list):
+        return [_resolve_option_tokens(v, options) for v in value]
+    if isinstance(value, str):
+        pattern = re.compile(r"<options\.([a-zA-Z0-9_]+)>")
+
+        def repl(match: re.Match[str]) -> str:
+            key = match.group(1)
+            if key in options:
+                return str(options[key])
+            return match.group(0)
+
+        return pattern.sub(repl, value)
+    return value
+
+
+def _create_plain_config(
+    data: dict[str, Any], options: dict[str, Any]
+) -> dict[str, Any]:
+    """Create a config dict without options metadata."""
+    filtered = {
+        key: copy.deepcopy(value)
+        for key, value in data.items()
+        if key not in ("options", "_notes", "_options_help")
+    }
+    return _resolve_option_tokens(filtered, options)
+
+
+def _write_plain_config(path: Path, data: dict[str, Any]) -> None:
+    """Write plain config to disk as JSON or YAML."""
+    suffix = path.suffix.lower()
+    if suffix == ".json":
+        path.write_text(json.dumps(data, indent=2) + "\n")
+        return
+
+    if suffix in (".yaml", ".yml"):
+        try:
+            import yaml
+        except ImportError as exc:
+            raise RuntimeError(
+                "pyyaml is required to render YAML configs. Install with 'pip install pyyaml'."
+            ) from exc
+
+        path.write_text(yaml.safe_dump(data, sort_keys=False))
+        return
+
+    # Default to JSON for unknown extensions
+    path.write_text(json.dumps(data, indent=2) + "\n")
+
+
 # =============================================================================
 # Parser setup for new commands
 # =============================================================================
@@ -529,6 +761,37 @@ Examples:
         help="Generate CMakeLists.txt only (with --from)",
     )
     parser.set_defaults(func=cmd_generate)
+
+
+def add_render_subparser(subparsers: argparse._SubParsersAction) -> None:
+    """Add 'render' command parser for configurable recipes."""
+    parser = subparsers.add_parser(
+        "render",
+        help="Render a configurable recipe config into project files",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  buildgen render myext/project.flex.json
+  buildgen render project.json -o out/myext
+  buildgen render project.flex.json --env venv
+        """,
+    )
+    parser.add_argument(
+        "config",
+        help="Config file generated by 'buildgen new <name> -r <configurable>'",
+    )
+    parser.add_argument(
+        "-o",
+        "--output",
+        help="Output directory (default: alongside config, named after project)",
+    )
+    parser.add_argument(
+        "-e",
+        "--env",
+        choices=["uv", "venv"],
+        help="Override environment tool from the config options",
+    )
+    parser.set_defaults(func=cmd_render)
 
 
 def cmd_templates_list(args: argparse.Namespace) -> None:
@@ -732,6 +995,7 @@ Common Commands:
   list                  List available recipes
   test                  Test recipe generation and building
   generate              Generate config or build files
+  render <config>       Render configurable recipe configs
 
 Advanced Commands:
   makefile              Direct Makefile generation
@@ -745,6 +1009,7 @@ Examples:
   buildgen test --all
   buildgen generate --config project.json
   buildgen generate --from project.json
+  buildgen render project.flex.json
         """,
     )
 
@@ -759,6 +1024,7 @@ Examples:
     add_list_subparser(subparsers)
     add_test_subparser(subparsers)
     add_generate_subparser(subparsers)
+    add_render_subparser(subparsers)
 
     # Advanced commands (Tier 3)
     add_makefile_subparsers(subparsers)
@@ -778,7 +1044,7 @@ def main() -> None:
         sys.exit(1)
 
     # Commands with direct func (new, list, test, generate)
-    if args.command in ("new", "list", "test", "generate"):
+    if args.command in ("new", "list", "test", "generate", "render"):
         if hasattr(args, "func"):
             try:
                 args.func(args)

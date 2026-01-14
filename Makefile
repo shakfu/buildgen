@@ -18,7 +18,7 @@ coverage-html:
 # Linting and formatting
 lint:
 	@echo "running ruff check"
-	@uv run ruff check src tests
+	@uv run ruff check --fix src tests
 
 format:
 	@echo "formatting code with ruff"

@@ -4,6 +4,18 @@ All notable changes to this project will be documented in this file.
 
 ## [unreleased]
 
+## [0.1.6]
+
+### Added
+
+- **Configurable Flex Recipes** - `buildgen new <name> -r py/pybind11-flex` now emits a `project.flex.json` that describes toggleable options (env tool, native test framework, CLI example). After editing, run the new `buildgen render <config>` command to materialize the project; the renderer forwards the selected options into the templates so `pyproject.toml`, `CMakeLists.txt`, and generated sources reflect your choices.
+
+### Changed
+
+- **mako & pyyaml are now dependencies** - All of the features are available in one shot.
+
+- **Plain Config Output After Render** - Rendering a flex config now produces a regular `project.json` inside the project (with placeholders resolved and `options` removed) while keeping the original `project.flex.json` alongside the config you edited. This keeps the configurable template for future edits without duplicating it in the generated project.
+
 ## [0.1.5]
 
 ### BREAKING CHANGES

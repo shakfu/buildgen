@@ -24,8 +24,9 @@
    - Option C: Separate test recipe that integrates
    
    > It will be impossible to implement configuration for all build variants from the command-line. It is better to generate a recipe which includes options: i.e. a configuragable recipe, which requires further input from the user.
+    > The new `py/pybind11-flex` recipe demonstrates this approach with native test toggles.
 
-   Here’s a sketch of a “configurable recipe with reasonable defaults” that pairs a `pybind11` module with optional C++ tests. The idea is that `buildgen new myext -r py/pybind11-flex` drops a config like the YAML below into the project, and the contributor tweaks the option switches before running buildgen generate.
+   Here’s a sketch of a “configurable recipe with reasonable defaults” that pairs a `pybind11` module with optional C++ tests. The idea is that `buildgen new myext -r py/pybind11-flex` drops a config like the example below into the project, and the contributor tweaks the option switches before running buildgen render (the current implementation emits `project.flex.json`).
    
    This follows the README’s structure (name/version/dependencies/targets) but adds an options block plus clearly commented toggles.
 
@@ -111,4 +112,3 @@
    - Encode in recipe: `py/pybind11-uv` vs `py/pybind11-venv`
 
    > The default should be `uv`, but see above, this can be changed by the user to `venv` at the recipe level.
-
