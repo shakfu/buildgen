@@ -114,6 +114,7 @@ config.generate_cmake_with_frontend(
 ```
 
 This creates:
+
 - `CMakeLists.txt` - The actual build logic
 - `Makefile` - Convenience wrapper with targets:
 
@@ -266,7 +267,7 @@ buildgen new myext -r py/pybind11 --env venv
 
 This creates a complete project structure:
 
-```
+```text
 myext/
   pyproject.toml      # scikit-build-core configuration
   CMakeLists.txt      # CMake build instructions
@@ -341,17 +342,20 @@ buildgen templates show py/pybind11
 ### Customizing Templates
 
 1. Copy the templates you want to customize:
+
    ```bash
    buildgen templates copy py/pybind11
    ```
 
 2. Edit the `.mako` files in `.buildgen/templates/py/pybind11/`:
+
    ```bash
    # Customize pyproject.toml template
    edit .buildgen/templates/py/pybind11/pyproject.toml.mako
    ```
 
 3. Generate projects - your customizations will be used:
+
    ```bash
    buildgen new myext -r py/pybind11
    ```

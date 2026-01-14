@@ -144,7 +144,7 @@ All notable changes to this project will be documented in this file.
   - `skbuild-cython` - Python extension using Cython
   - `skbuild-c` - Python C extension (direct Python.h)
   - `skbuild-nanobind` - Python extension using nanobind (modern C++ bindings)
-  - Each template includes: pyproject.toml, CMakeLists.txt, source files, __init__.py, tests
+  - Each template includes: pyproject.toml, CMakeLists.txt, source files, **init**.py, tests
 
 - **Makefile Frontend for skbuild Projects**
   - `make sync` - Initial environment setup (`uv sync`)
