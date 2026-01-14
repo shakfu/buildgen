@@ -1,5 +1,5 @@
 .PHONY: all test coverage coverage-html lint format format-check typecheck \
-		build check publish publish-test clean
+		build check publish publish-test clean fullcheck
 
 all: test
 
@@ -32,13 +32,16 @@ typecheck:
 	@echo "running type checkers"
 	@uv run mypy src
 
+fullcheck: lint format typecheck
+	@echo "running all checkers"
+
 # Build and publish
 build:
 	@echo "building distribution"
 	@uv build
 	@uv run twine check dist/*
 
-check: build
+check:
 	@echo "checking distribution with twine"
 	@uv run twine check dist/*
 
