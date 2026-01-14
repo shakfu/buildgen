@@ -4,6 +4,21 @@ All notable changes to this project will be documented in this file.
 
 ## [unreleased]
 
+## [0.1.7]
+
+### Added
+
+- **Recipe regression tests** - Added pytest coverage that instantiates every recipe, runs CMake builds for C/C++ templates, and keeps artifacts under `build/build-output/<test>/<recipe>/` for inspection.
+- **Persistent build/test outputs** - Test session now resets both `build/test-output/` (legacy file-render fixtures) and the new `build/build-output/` folders before each run so inspection directories are always fresh.
+- **Skbuild builds by default** - Recipe tests now run `uv sync` followed by `uv build` for Python extension templates automatically; pass `--skip-skbuild-build` to pytest when you need to opt out.
+- **Pybind11-flex README** - The configurable recipe now generates a short `README.md` so scikit-build-core metadata parsing succeeds out of the box.
+- **Pybind11-flex test harness defaults** - Automated regression tests disable the native Catch2/GTest harness (and CLI example) when rendering `py/pybind11-flex` so CI-only build toolchains without Catch2 can still compile the template.
+
+### Changed
+
+- **Pybind11-flex dev dependency floor lowered** - The generated `pybind11-stubgen` requirement now targets `>=0.14` so offline development environments (like CI mirrors) can satisfy it with the commonly mirrored 2.5.x releases.
+
+
 ## [0.1.6]
 
 ### Added

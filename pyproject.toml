@@ -1,6 +1,6 @@
 [project]
 name = "buildgen"
-version = "0.1.6"
+version = "0.1.7"
 description = "Build system generator - Makefile, CMake, scikit-build-core and more."
 readme = "README.md"
 authors = [

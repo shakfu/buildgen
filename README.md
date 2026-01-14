@@ -2,7 +2,7 @@
 
 A build system generator package supporting Makefile, CMake, and [scikit-build-core](https://github.com/scikit-build/scikit-build-core) project definitions.
 
-Originally inspired by prior work on `shedskin.makefile` in the [shedskin project](https://github.com/shedskin/shedskin).
+**Note**: the buildgen test suite generates, build and tests every one of its recipes.
 
 ## Installation
 

@@ -1,5 +1,9 @@
 # TODO
 
+## Bootstrapping
+
+Currently require `cmake`, `make`, and `uv`. How do we deal if one of these is not available?
+
 ## Extended Recipes
 
 - [ ] Testing recipes: `cpp/catch2`, `cpp/gtest`

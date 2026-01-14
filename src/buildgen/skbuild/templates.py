@@ -49,6 +49,7 @@ TEMPLATE_FILES = {
     "skbuild-pybind11-flex": {
         "Makefile": "common/Makefile.{env}.mako",
         "pyproject.toml": "pyproject.toml.mako",
+        "README.md": "README.md.mako",
         "CMakeLists.txt": "CMakeLists.txt.mako",
         "project.flex.json": "project.flex.json.mako",
         "src/${name}/__init__.py": "src/__init__.py.mako",

@@ -30,7 +30,7 @@ classifiers = [
 [project.optional-dependencies]
 dev = [
     "pytest>=8.0",
-    "pybind11-stubgen>=2023.10",
+    "pybind11-stubgen>=0.14",
 ]
 
 [tool.scikit-build]
