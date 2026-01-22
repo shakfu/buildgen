@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 ## [unreleased]
 
+## [0.1.8]
+
+### Fixed
+
+- **bug which caused crash of cli** -- due to missing subcmd.
+
 ## [0.1.7]
 
 ### Added
