@@ -3,12 +3,15 @@
 import subprocess
 
 # Get Make version for syntax compatibility
-VERSION = float(
+_version_str = (
     subprocess.check_output(["make", "-v"])
     .decode()
     .split("\n")[0]
     .replace("GNU Make ", "")
 )
+# Parse major.minor from version string (e.g., "4.4.1" -> 4.4)
+_version_parts = _version_str.split(".")
+VERSION = float(f"{_version_parts[0]}.{_version_parts[1]}")
 
 
 class Var:
