@@ -24,7 +24,7 @@ jobs:
       run: uv sync
 
     - name: Run checks
-      run: make fullcheck
+      run: make qa
 
     - name: Build a binary wheel and a source tarball
       run: make build
