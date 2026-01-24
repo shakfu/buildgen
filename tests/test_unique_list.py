@@ -1,5 +1,5 @@
 import pytest
-from hypothesis import given, assume, settings
+from hypothesis import given, settings
 from hypothesis import strategies as st
 
 from buildgen.common.utils import UniqueList
@@ -372,7 +372,9 @@ class TestUniqueListPropertyBased:
         assert new_item in ul
 
     @given(st.lists(st.integers()), st.lists(st.integers()))
-    def test_add_operator_preserves_uniqueness(self, items1: list[int], items2: list[int]):
+    def test_add_operator_preserves_uniqueness(
+        self, items1: list[int], items2: list[int]
+    ):
         """+ operator maintains uniqueness invariant."""
         ul1 = UniqueList(items1)
         ul2 = UniqueList(items2)
@@ -384,7 +386,9 @@ class TestUniqueListPropertyBased:
             assert item in result
 
     @given(st.lists(st.integers()), st.lists(st.integers()))
-    def test_iadd_operator_preserves_uniqueness(self, items1: list[int], items2: list[int]):
+    def test_iadd_operator_preserves_uniqueness(
+        self, items1: list[int], items2: list[int]
+    ):
         """+= operator maintains uniqueness invariant."""
         ul = UniqueList(items1)
         ul += items2

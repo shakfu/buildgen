@@ -26,7 +26,12 @@ def get_make_version() -> float:
             # Parse major.minor from version string (e.g., "4.4.1" -> 4.4)
             parts = version_str.split(".")
             _VERSION = float(f"{parts[0]}.{parts[1]}")
-        except (FileNotFoundError, subprocess.CalledProcessError, ValueError, IndexError):
+        except (
+            FileNotFoundError,
+            subprocess.CalledProcessError,
+            ValueError,
+            IndexError,
+        ):
             _VERSION = 4.0  # Default to modern Make syntax
     return _VERSION
 

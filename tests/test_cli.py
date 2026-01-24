@@ -3,8 +3,6 @@
 import subprocess
 import sys
 
-import pytest
-
 
 class TestCLIImport:
     """Test that CLI modules can be imported without errors."""

@@ -585,7 +585,10 @@ def _write_plain_config(path: Path, data: dict[str, Any]) -> None:
 
 def cmd_templates_list(args: argparse.Namespace) -> None:
     """List available template types."""
-    from buildgen.templates.resolver import get_builtin_template_recipes, TemplateResolver
+    from buildgen.templates.resolver import (
+        get_builtin_template_recipes,
+        TemplateResolver,
+    )
 
     resolver = TemplateResolver(Path.cwd())
     recipes = get_builtin_template_recipes()

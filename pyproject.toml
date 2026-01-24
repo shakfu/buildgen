@@ -1,6 +1,6 @@
 [project]
 name = "buildgen"
-version = "0.1.8"
+version = "0.1.9"
 description = "Build system generator - Makefile, CMake, scikit-build-core and more."
 readme = "README.md"
 authors = [
@@ -57,6 +57,7 @@ dev = [
     "pytest-cov>=7.0.0",
     "ruff>=0.14.9",
     "twine>=6.2.0",
+    "types-PyYAML>=6.0.0",
 ]
 
 [build-system]

@@ -4,6 +4,33 @@ All notable changes to this project will be documented in this file.
 
 ## [unreleased]
 
+## [0.1.9]
+
+### Added
+
+- **CLI Modularization** - Restructured CLI from single `cli.py` into a proper module (`cli/__init__.py`, `cli/commands.py`, `cli/main.py`, `cli/parsers.py`) for better maintainability and extensibility.
+
+- **New Project Templates** - Added common templates for generated projects:
+  - `CHANGELOG.md.mako` - Changelog template
+  - `LICENSE.mako` - MIT license template
+  - `gitignore.cmake.mako` - CMake project .gitignore
+  - `gitignore.python.mako` - Python project .gitignore
+  - GitHub workflow templates (`build-publish.yml.mako`, `ci.yml.mako`)
+
+- **Python Extension Improvements**:
+  - Added `py.typed` marker files to all Python extension templates (pybind11, nanobind, cython, cext) for PEP 561 compliance
+  - Added base pyproject template (`pyproject.base.toml.mako`) for shared configuration
+
+- **Enhanced Makefile Templates** - Expanded `Makefile.uv.mako` and `Makefile.venv.mako` with additional targets and improved functionality.
+
+- **Comprehensive Test Suite**:
+  - Added CLI tests (`tests/test_cli.py`) covering command parsing and execution
+  - Added `UniqueList` tests (`tests/test_unique_list.py`)
+
+### Fixed
+
+- **Makefile variable handling** - Fixed bug in `makefile/variables.py` affecting variable generation.
+
 ## [0.1.8]
 
 ### Fixed
