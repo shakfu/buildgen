@@ -9,11 +9,12 @@ build_examples = bool(opts.get("build_examples", False))
 build_cpp_tests_default = "ON" if test_framework != "none" else "OFF"
 %>
 
-cmake_minimum_required(VERSION 3.18...3.30)
+cmake_minimum_required(VERSION 3.18...3.31)
 project(${"$"}{SKBUILD_PROJECT_NAME} VERSION ${"$"}{SKBUILD_PROJECT_VERSION} LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 option(BUILD_CPP_TESTS "Build native Catch2/GTest harness" ${build_cpp_tests_default})
 if(NOT DEFINED TEST_FRAMEWORK)
@@ -26,6 +27,13 @@ find_package(pybind11 CONFIG REQUIRED)
 
 pybind11_add_module(_core MODULE src/${name}/_core.cpp)
 target_compile_features(_core PRIVATE cxx_std_17)
+
+if(MSVC)
+    target_compile_options(_core PRIVATE /W4)
+else()
+    target_compile_options(_core PRIVATE -Wall -Wextra)
+endif()
+
 install(TARGETS _core DESTINATION ${name})
 
 if(BUILD_CPP_TESTS)

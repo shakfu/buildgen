@@ -1,7 +1,7 @@
 """Abstract base classes for build system generators and builders."""
 
-import os
 import shutil
+import subprocess
 from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Optional
@@ -117,7 +117,9 @@ class BaseBuilder(ABC):
     def _execute(self, cmd: str) -> None:
         """Execute a shell command."""
         print(cmd)
-        os.system(cmd)
+        result = subprocess.run(cmd, shell=True, check=False)
+        if result.returncode != 0:
+            raise RuntimeError(f"Command failed with code {result.returncode}: {cmd}")
 
     def _remove(self, path: PathLike) -> None:
         """Remove a file or directory."""

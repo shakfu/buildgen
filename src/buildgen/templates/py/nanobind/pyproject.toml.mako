@@ -1,15 +1,9 @@
-[build-system]
-requires = ["scikit-build-core", "nanobind"]
-build-backend = "scikit_build_core.build"
-
-[project]
-name = "${name}"
-version = "0.1.0"
-description = "A Python extension module built with nanobind"
-requires-python = ">=3.9"
-
-[tool.scikit-build]
-wheel.packages = ["src/${name}"]
-
-[dependency-groups]
-dev = ["pytest>=8.0"]
+<%page args="name, options={}" />
+<%include file="common/pyproject.base.toml.mako" args="
+    name=name,
+    framework='nanobind',
+    framework_pkg='nanobind',
+    description='A Python extension module built with nanobind',
+    lang_classifier='C++',
+    options=options
+"/>

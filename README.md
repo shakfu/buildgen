@@ -173,7 +173,7 @@ make CMAKE_FLAGS="-DFOO=bar"
 }
 ```
 
-### YAML format
+### YAML Format
 
 ```yaml
 name: myproject

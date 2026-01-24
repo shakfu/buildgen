@@ -144,12 +144,16 @@ class TestPybind11Generation:
         gen = SkbuildProjectGenerator("myext", "skbuild-pybind11", output_dir)
         created = gen.generate()
 
-        assert len(created) == 6
+        assert len(created) == 13
+        assert (output_dir / ".gitignore").exists()
         assert (output_dir / "Makefile").exists()
         assert (output_dir / "pyproject.toml").exists()
+        assert (output_dir / "README.md").exists()
+        assert (output_dir / "CHANGELOG.md").exists()
         assert (output_dir / "CMakeLists.txt").exists()
         assert (output_dir / "src/myext/__init__.py").exists()
         assert (output_dir / "src/myext/_core.cpp").exists()
+        assert (output_dir / "src/myext/py.typed").exists()
         assert (output_dir / "tests/test_myext.py").exists()
 
     def test_pyproject_content(self, output_dir):
@@ -311,12 +315,16 @@ class TestCythonGeneration:
         gen = SkbuildProjectGenerator("cyext", "skbuild-cython", output_dir)
         created = gen.generate()
 
-        assert len(created) == 6
+        assert len(created) == 13
+        assert (output_dir / ".gitignore").exists()
         assert (output_dir / "Makefile").exists()
         assert (output_dir / "pyproject.toml").exists()
+        assert (output_dir / "README.md").exists()
+        assert (output_dir / "CHANGELOG.md").exists()
         assert (output_dir / "CMakeLists.txt").exists()
         assert (output_dir / "src/cyext/__init__.py").exists()
         assert (output_dir / "src/cyext/_core.pyx").exists()
+        assert (output_dir / "src/cyext/py.typed").exists()
         assert (output_dir / "tests/test_cyext.py").exists()
 
     def test_pyproject_content(self, output_dir):
@@ -352,12 +360,16 @@ class TestCExtensionGeneration:
         gen = SkbuildProjectGenerator("cext", "skbuild-c", output_dir)
         created = gen.generate()
 
-        assert len(created) == 6
+        assert len(created) == 13
+        assert (output_dir / ".gitignore").exists()
         assert (output_dir / "Makefile").exists()
         assert (output_dir / "pyproject.toml").exists()
+        assert (output_dir / "README.md").exists()
+        assert (output_dir / "CHANGELOG.md").exists()
         assert (output_dir / "CMakeLists.txt").exists()
         assert (output_dir / "src/cext/__init__.py").exists()
         assert (output_dir / "src/cext/_core.c").exists()
+        assert (output_dir / "src/cext/py.typed").exists()
         assert (output_dir / "tests/test_cext.py").exists()
 
     def test_pyproject_content(self, output_dir):
@@ -398,12 +410,16 @@ class TestNanobindGeneration:
         gen = SkbuildProjectGenerator("nbext", "skbuild-nanobind", output_dir)
         created = gen.generate()
 
-        assert len(created) == 6
+        assert len(created) == 13
+        assert (output_dir / ".gitignore").exists()
         assert (output_dir / "Makefile").exists()
         assert (output_dir / "pyproject.toml").exists()
+        assert (output_dir / "README.md").exists()
+        assert (output_dir / "CHANGELOG.md").exists()
         assert (output_dir / "CMakeLists.txt").exists()
         assert (output_dir / "src/nbext/__init__.py").exists()
         assert (output_dir / "src/nbext/_core.cpp").exists()
+        assert (output_dir / "src/nbext/py.typed").exists()
         assert (output_dir / "tests/test_nbext.py").exists()
 
     def test_pyproject_content(self, output_dir):

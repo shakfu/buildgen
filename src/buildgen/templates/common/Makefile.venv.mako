@@ -6,7 +6,9 @@
 #
 # Assumes a virtualenv is active. Override commands with PYTHON and PIP.
 
-.PHONY: all build install dev test clean distclean wheel sdist help
+.PHONY: all build install dev test lint format typecheck qa clean \
+        distclean wheel sdist dist check publish-test publish upgrade \
+        coverage coverage-html docs release help
 
 PYTHON ?= python
 PIP ?= pip
@@ -16,27 +18,84 @@ all: build
 
 # Build the extension (in-place for development)
 build:
-	$(PIP) install --no-build-isolation -ve .
+	@$(PIP) install --no-build-isolation -ve .
 
 # Install the package
 install:
-	$(PIP) install --no-build-isolation -v .
+	@$(PIP) install --no-build-isolation -v .
 
 # Development install (editable)
 dev:
-	$(PIP) install --no-build-isolation -ve .
+	@$(PIP) install --no-build-isolation -ve .
 
 # Run tests
 test: build
-	$(PYTHON) -m pytest tests/ -v
+	@$(PYTHON) -m pytest tests/ -v
+
+# Lint with ruff
+lint:
+	@$(PYTHON) -m ruff check --fix src/ tests/
+
+# Format with ruff
+format:
+	@$(PYTHON) -m ruff format src/ tests/
+
+# Type check with mypy
+typecheck:
+	@$(PYTHON) -m mypy src/${name}/__init__.py tests/ --exclude '.venv'
+
+# Run a full quality assurance check
+qa: test lint typecheck format
 
 # Build wheel
 wheel:
-	$(PYTHON) -m build --wheel --no-isolation
+	@$(PYTHON) -m build --wheel --no-isolation
 
 # Build source distribution
 sdist:
-	$(PYTHON) -m build --sdist --no-isolation
+	@$(PYTHON) -m build --sdist --no-isolation
+
+# Check distributions with twine
+check:
+	@$(PYTHON) -m twine check dist/*
+
+# Build both wheel and sdist
+dist: wheel sdist check
+
+# Publish to TestPyPI
+publish-test: check
+	@$(PYTHON) -m twine upload --repository testpypi dist/*
+
+# Publish to PyPI
+publish: check
+	@$(PYTHON) -m twine upload dist/*
+
+# Upgrade dev dependencies
+upgrade:
+	@$(PIP) install --upgrade mypy pytest pytest-cov ruff twine
+
+# Run tests with coverage
+coverage:
+	@$(PYTHON) -m pytest tests/ -v --cov=src/${name} --cov-report=term-missing
+
+# Generate HTML coverage report
+coverage-html:
+	@$(PYTHON) -m pytest tests/ -v --cov=src/${name} --cov-report=html
+	@echo "Coverage report: htmlcov/index.html"
+
+# Build documentation (requires sphinx in dev dependencies)
+docs:
+	@$(PYTHON) -m sphinx -b html docs/ docs/_build/html
+
+# Create a release (bump version, tag, push)
+release:
+	@echo "Current version: $$(grep '^version' pyproject.toml | head -1)"
+	@read -p "New version: " version; \
+	sed -i '' "s/^version = .*/version = \"$$version\"/" pyproject.toml; \
+	git add pyproject.toml; \
+	git commit -m "Bump version to $$version"; \
+	git tag -a "v$$version" -m "Release $$version"; \
+	echo "Tagged v$$version. Run 'git push && git push --tags' to publish."
 
 # Clean build artifacts
 clean:
@@ -56,13 +115,26 @@ distclean: clean
 # Show help
 help:
 	@echo "Available targets:"
-	@echo "  all       - Build the extension (default)"
-	@echo "  build     - Build and install in development mode"
-	@echo "  install   - Install the package"
-	@echo "  dev       - Development install (editable)"
-	@echo "  test      - Run tests"
-	@echo "  wheel     - Build wheel distribution"
-	@echo "  sdist     - Build source distribution"
-	@echo "  clean     - Remove build artifacts"
-	@echo "  distclean - Remove all generated files"
-	@echo "  help      - Show this help message"
+	@echo "  all          - Build the extension (default)"
+	@echo "  build        - Build and install in development mode"
+	@echo "  install      - Install the package"
+	@echo "  dev          - Development install (editable)"
+	@echo "  test         - Run tests"
+	@echo "  lint         - Lint with ruff"
+	@echo "  format       - Format with ruff"
+	@echo "  typecheck    - Type check with mypy"
+	@echo "  qa           - Run full quality assurance (test, lint, typecheck, format)"
+	@echo "  wheel        - Build wheel distribution"
+	@echo "  sdist        - Build source distribution"
+	@echo "  dist         - Build both wheel and sdist"
+	@echo "  check        - Check distributions with twine"
+	@echo "  publish-test - Publish to TestPyPI"
+	@echo "  publish      - Publish to PyPI"
+	@echo "  upgrade      - Upgrade dev dependencies"
+	@echo "  coverage     - Run tests with coverage"
+	@echo "  coverage-html- Generate HTML coverage report"
+	@echo "  docs         - Build documentation with Sphinx"
+	@echo "  release      - Bump version, tag, and prepare release"
+	@echo "  clean        - Remove build artifacts"
+	@echo "  distclean    - Remove all generated files"
+	@echo "  help         - Show this help message"

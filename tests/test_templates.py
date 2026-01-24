@@ -213,13 +213,20 @@ class TestResolveTemplateFiles:
         # resolve_template_files still uses legacy type names internally
         resolved = resolve_template_files("skbuild-pybind11")
 
-        # Should have 6 files
-        assert len(resolved) == 6
+        # Should have 13 files
+        assert len(resolved) == 13
 
         # Check expected output paths
+        assert ".gitignore" in resolved
+        assert ".github/workflows/ci.yml" in resolved
+        assert ".github/workflows/build-publish.yml" in resolved
+        assert "CHANGELOG.md" in resolved
+        assert "LICENSE" in resolved
         assert "Makefile" in resolved
         assert "pyproject.toml" in resolved
+        assert "README.md" in resolved
         assert "CMakeLists.txt" in resolved
+        assert "src/${name}/py.typed" in resolved
 
         # All should be built-in
         for path, source in resolved.values():

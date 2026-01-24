@@ -3,12 +3,14 @@
 from pathlib import Path
 from typing import Optional, Any, Dict
 
+from mako.lookup import TemplateLookup
 from mako.template import Template
 from buildgen.skbuild.templates import (
     SKBUILD_TYPES,
     TEMPLATE_FILES,
     resolve_template_files,
 )
+from buildgen.templates.resolver import BUILTIN_TEMPLATES_DIR
 
 # Valid environment tool choices
 ENV_TOOLS = ("uv", "venv")
@@ -115,7 +117,16 @@ class SkbuildProjectGenerator:
         Returns:
             Rendered template content.
         """
-        template = Template(filename=str(template_path))
+        # Use TemplateLookup to enable <%include> directives
+        # Search in the template's parent directory and the py/ templates root
+        lookup = TemplateLookup(
+            directories=[
+                str(template_path.parent),
+                str(BUILTIN_TEMPLATES_DIR / "py"),
+            ],
+            input_encoding="utf-8",
+        )
+        template = lookup.get_template(template_path.name)
         render_args = {"name": self.name}
         if self.context:
             render_args.update(self.context)

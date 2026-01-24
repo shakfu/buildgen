@@ -35,28 +35,33 @@ class CMakeProjectGenerator:
     TEMPLATE_FILES = {
         # C++ templates
         "cpp/executable": {
+            ".gitignore": "common/gitignore.cmake.mako",
             "Makefile": "common/Makefile.cmake.mako",
             "CMakeLists.txt": "CMakeLists.txt.mako",
             "src/main.cpp": "src/main.cpp.mako",
         },
         "cpp/static": {
+            ".gitignore": "common/gitignore.cmake.mako",
             "Makefile": "common/Makefile.cmake.mako",
             "CMakeLists.txt": "CMakeLists.txt.mako",
             "src/lib.cpp": "src/lib.cpp.mako",
             "include/${name}/lib.hpp": "include/${name}/lib.hpp.mako",
         },
         "cpp/shared": {
+            ".gitignore": "common/gitignore.cmake.mako",
             "Makefile": "common/Makefile.cmake.mako",
             "CMakeLists.txt": "CMakeLists.txt.mako",
             "src/lib.cpp": "src/lib.cpp.mako",
             "include/${name}/lib.hpp": "include/${name}/lib.hpp.mako",
         },
         "cpp/header-only": {
+            ".gitignore": "common/gitignore.cmake.mako",
             "Makefile": "common/Makefile.cmake.mako",
             "CMakeLists.txt": "CMakeLists.txt.mako",
             "include/${name}/lib.hpp": "include/${name}/lib.hpp.mako",
         },
         "cpp/library-with-tests": {
+            ".gitignore": "common/gitignore.cmake.mako",
             "Makefile": "common/Makefile.cmake.mako",
             "CMakeLists.txt": "CMakeLists.txt.mako",
             "src/lib.cpp": "src/lib.cpp.mako",
@@ -64,6 +69,7 @@ class CMakeProjectGenerator:
             "tests/test_main.cpp": "tests/test_main.cpp.mako",
         },
         "cpp/app-with-lib": {
+            ".gitignore": "common/gitignore.cmake.mako",
             "Makefile": "common/Makefile.cmake.mako",
             "CMakeLists.txt": "CMakeLists.txt.mako",
             "src/main.cpp": "src/main.cpp.mako",
@@ -71,6 +77,7 @@ class CMakeProjectGenerator:
             "include/${name}/lib.hpp": "include/${name}/lib.hpp.mako",
         },
         "cpp/full": {
+            ".gitignore": "common/gitignore.cmake.mako",
             "Makefile": "common/Makefile.cmake.mako",
             "CMakeLists.txt": "CMakeLists.txt.mako",
             "src/main.cpp": "src/main.cpp.mako",
@@ -80,28 +87,33 @@ class CMakeProjectGenerator:
         },
         # C templates
         "c/executable": {
+            ".gitignore": "common/gitignore.cmake.mako",
             "Makefile": "common/Makefile.cmake.mako",
             "CMakeLists.txt": "CMakeLists.txt.mako",
             "src/main.c": "src/main.c.mako",
         },
         "c/static": {
+            ".gitignore": "common/gitignore.cmake.mako",
             "Makefile": "common/Makefile.cmake.mako",
             "CMakeLists.txt": "CMakeLists.txt.mako",
             "src/lib.c": "src/lib.c.mako",
             "include/${name}/lib.h": "include/${name}/lib.h.mako",
         },
         "c/shared": {
+            ".gitignore": "common/gitignore.cmake.mako",
             "Makefile": "common/Makefile.cmake.mako",
             "CMakeLists.txt": "CMakeLists.txt.mako",
             "src/lib.c": "src/lib.c.mako",
             "include/${name}/lib.h": "include/${name}/lib.h.mako",
         },
         "c/header-only": {
+            ".gitignore": "common/gitignore.cmake.mako",
             "Makefile": "common/Makefile.cmake.mako",
             "CMakeLists.txt": "CMakeLists.txt.mako",
             "include/${name}/lib.h": "include/${name}/lib.h.mako",
         },
         "c/library-with-tests": {
+            ".gitignore": "common/gitignore.cmake.mako",
             "Makefile": "common/Makefile.cmake.mako",
             "CMakeLists.txt": "CMakeLists.txt.mako",
             "src/lib.c": "src/lib.c.mako",
@@ -109,6 +121,7 @@ class CMakeProjectGenerator:
             "tests/test_main.c": "tests/test_main.c.mako",
         },
         "c/app-with-lib": {
+            ".gitignore": "common/gitignore.cmake.mako",
             "Makefile": "common/Makefile.cmake.mako",
             "CMakeLists.txt": "CMakeLists.txt.mako",
             "src/main.c": "src/main.c.mako",
@@ -116,6 +129,7 @@ class CMakeProjectGenerator:
             "include/${name}/lib.h": "include/${name}/lib.h.mako",
         },
         "c/full": {
+            ".gitignore": "common/gitignore.cmake.mako",
             "Makefile": "common/Makefile.cmake.mako",
             "CMakeLists.txt": "CMakeLists.txt.mako",
             "src/main.c": "src/main.c.mako",

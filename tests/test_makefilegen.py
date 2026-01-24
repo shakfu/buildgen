@@ -290,7 +290,8 @@ class TestMakefileWriter:
     def test_makefile_writer_creation(self, temp_makefile):
         """Test MakefileWriter creation"""
         writer = MakefileWriter(temp_makefile)
-        assert hasattr(writer, "makefile")
+        assert hasattr(writer, "path")
+        assert hasattr(writer, "lines")
         writer.close()
 
     def test_write_content(self, temp_makefile):

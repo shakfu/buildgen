@@ -1,14 +1,32 @@
 """Makefile variable classes for different assignment types."""
 
 import subprocess
+from typing import Optional
 
-# Get Make version for syntax compatibility
-VERSION = float(
-    subprocess.check_output(["make", "-v"])
-    .decode()
-    .split("\n")[0]
-    .replace("GNU Make ", "")
-)
+# Lazy-loaded make version for syntax compatibility
+_VERSION: Optional[float] = None
+
+
+def get_make_version() -> float:
+    """Get GNU Make version, with lazy loading and graceful fallback.
+
+    Returns:
+        Make version as a float (e.g., 4.3). Defaults to 4.0 if make
+        is not installed or version cannot be determined.
+    """
+    global _VERSION
+    if _VERSION is None:
+        try:
+            output = subprocess.check_output(
+                ["make", "-v"],
+                stderr=subprocess.DEVNULL,
+                encoding="utf-8",
+            )
+            version_str = output.split("\n")[0].replace("GNU Make ", "")
+            _VERSION = float(version_str)
+        except (FileNotFoundError, subprocess.CalledProcessError, ValueError):
+            _VERSION = 4.0  # Default to modern Make syntax
+    return _VERSION
 
 
 class Var:
@@ -26,7 +44,7 @@ class Var:
         if "\n" in self.value:
             lines = self.value.split("\n")
             values = "\n".join(lines)
-            if VERSION > 3.81:
+            if get_make_version() > 3.81:
                 return f"define {self.key} {self.assign_op}\n{values}\nendef\n"
             else:
                 return f"define {self.key}\n{values}\nendef\n"

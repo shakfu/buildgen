@@ -9,10 +9,6 @@ build_examples = bool(opts.get("build_examples", False))
 build_cpp_tests = test_framework != "none"
 %>
 
-[build-system]
-requires = ["scikit-build-core", "pybind11", "pyproject-metadata"]
-build-backend = "scikit_build_core.build"
-
 [project]
 name = "${name}"
 version = "0.1.0"
@@ -27,14 +23,28 @@ classifiers = [
     "Typing :: Typed",
 ]
 
-[project.optional-dependencies]
+[dependency-groups]
 dev = [
-    "pytest>=8.0",
+    "mypy>=1.19.1",
     "pybind11-stubgen>=0.14",
+    "pytest>=8.4.2",
+    "pytest-cov>=7.0.0",
+    "ruff>=0.14.9",
+    "twine>=6.2.0",
 ]
+
+[build-system]
+requires = ["scikit-build-core", "pybind11", "pyproject-metadata"]
+build-backend = "scikit_build_core.build"
 
 [tool.scikit-build]
 wheel.packages = ["src/${name}"]
+cmake.args = []
+cmake.build-type = "Release"
+cmake.source-dir = "."
+sdist.include = []
+sdist.exclude = []
+wheel.exclude = []
 
 [tool.scikit-build.cmake.define]
 BUILD_CPP_TESTS = ${"true" if build_cpp_tests else "false"}

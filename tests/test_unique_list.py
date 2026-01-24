@@ -1,4 +1,6 @@
 import pytest
+from hypothesis import given, assume, settings
+from hypothesis import strategies as st
 
 from buildgen.common.utils import UniqueList
 
@@ -304,3 +306,156 @@ def test_unique_list():
     # Slicing works too
     first_three = ul[:3]
     assert list(first_three) == [1, 2, 3]
+
+
+class TestUniqueListPropertyBased:
+    """Property-based tests for UniqueList using Hypothesis."""
+
+    @given(st.lists(st.integers()))
+    def test_uniqueness_invariant(self, items: list[int]):
+        """All elements in UniqueList are unique."""
+        ul = UniqueList(items)
+        assert len(ul) == len(set(ul))
+
+    @given(st.lists(st.integers()))
+    def test_preserves_first_occurrence_order(self, items: list[int]):
+        """First occurrences maintain their relative order."""
+        ul = UniqueList(items)
+        seen = []
+        for item in items:
+            if item not in seen:
+                seen.append(item)
+        assert list(ul) == seen
+
+    @given(st.lists(st.integers()), st.integers())
+    def test_add_idempotent(self, items: list[int], new_item: int):
+        """Adding an existing element doesn't change the list."""
+        ul = UniqueList(items)
+        if new_item in ul:
+            original = list(ul)
+            ul.add(new_item)
+            assert list(ul) == original
+
+    @given(st.lists(st.integers()), st.integers())
+    def test_add_preserves_uniqueness(self, items: list[int], new_item: int):
+        """Adding any element maintains uniqueness invariant."""
+        ul = UniqueList(items)
+        ul.add(new_item)
+        assert len(ul) == len(set(ul))
+        assert new_item in ul
+
+    @given(st.lists(st.integers()), st.integers())
+    def test_append_preserves_uniqueness(self, items: list[int], new_item: int):
+        """Appending any element maintains uniqueness invariant."""
+        ul = UniqueList(items)
+        ul.append(new_item)
+        assert len(ul) == len(set(ul))
+        assert new_item in ul
+
+    @given(st.lists(st.integers()), st.lists(st.integers()))
+    def test_extend_preserves_uniqueness(self, items1: list[int], items2: list[int]):
+        """Extending maintains uniqueness invariant."""
+        ul = UniqueList(items1)
+        ul.extend(items2)
+        assert len(ul) == len(set(ul))
+        for item in items2:
+            assert item in ul
+
+    @given(st.lists(st.integers(), min_size=1), st.integers(min_value=0))
+    def test_insert_preserves_uniqueness(self, items: list[int], idx: int):
+        """Inserting maintains uniqueness invariant."""
+        ul = UniqueList(items)
+        new_item = max(items) + 1  # Ensure new unique item
+        idx = idx % (len(ul) + 1)  # Valid index
+        ul.insert(idx, new_item)
+        assert len(ul) == len(set(ul))
+        assert new_item in ul
+
+    @given(st.lists(st.integers()), st.lists(st.integers()))
+    def test_add_operator_preserves_uniqueness(self, items1: list[int], items2: list[int]):
+        """+ operator maintains uniqueness invariant."""
+        ul1 = UniqueList(items1)
+        ul2 = UniqueList(items2)
+        result = ul1 + ul2
+        assert len(result) == len(set(result))
+        for item in items1:
+            assert item in result
+        for item in items2:
+            assert item in result
+
+    @given(st.lists(st.integers()), st.lists(st.integers()))
+    def test_iadd_operator_preserves_uniqueness(self, items1: list[int], items2: list[int]):
+        """+= operator maintains uniqueness invariant."""
+        ul = UniqueList(items1)
+        ul += items2
+        assert len(ul) == len(set(ul))
+        for item in items1:
+            assert item in ul
+        for item in items2:
+            assert item in ul
+
+    @given(st.lists(st.integers()))
+    def test_length_equals_unique_count(self, items: list[int]):
+        """Length equals number of unique elements in input."""
+        ul = UniqueList(items)
+        assert len(ul) == len(set(items))
+
+    @given(st.lists(st.integers(), min_size=1))
+    def test_first_and_last_are_elements(self, items: list[int]):
+        """first() and last() return elements from the list."""
+        ul = UniqueList(items)
+        assert ul.first() in ul
+        assert ul.last() in ul
+        assert ul.first() == ul[0]
+        assert ul.last() == ul[-1]
+
+    @given(st.lists(st.integers()))
+    def test_membership_consistent_with_set(self, items: list[int]):
+        """Membership testing is consistent with set membership."""
+        ul = UniqueList(items)
+        item_set = set(items)
+        for item in items:
+            assert (item in ul) == (item in item_set)
+        # Test some items not in list
+        for i in range(-10, 10):
+            assert (i in ul) == (i in item_set)
+
+    @given(st.lists(st.integers()))
+    def test_iteration_yields_all_unique_elements(self, items: list[int]):
+        """Iteration yields exactly the unique elements."""
+        ul = UniqueList(items)
+        iterated = list(ul)
+        assert len(iterated) == len(set(items))
+        assert set(iterated) == set(items)
+
+    @given(st.lists(st.text(min_size=1, max_size=10)))
+    def test_works_with_strings(self, items: list[str]):
+        """UniqueList works correctly with string elements."""
+        ul = UniqueList(items)
+        assert len(ul) == len(set(items))
+        for item in items:
+            assert item in ul
+
+    @given(st.lists(st.tuples(st.integers(), st.integers())))
+    def test_works_with_tuples(self, items: list[tuple[int, int]]):
+        """UniqueList works correctly with tuple elements."""
+        ul = UniqueList(items)
+        assert len(ul) == len(set(items))
+        for item in items:
+            assert item in ul
+
+    @given(st.lists(st.integers(), min_size=1))
+    @settings(max_examples=50)
+    def test_slicing_preserves_order(self, items: list[int]):
+        """Slicing preserves element order."""
+        ul = UniqueList(items)
+        if len(ul) >= 2:
+            sliced = ul[1:]
+            assert list(sliced) == list(ul)[1:]
+
+    @given(st.lists(st.integers(), min_size=1))
+    def test_index_finds_correct_position(self, items: list[int]):
+        """index() returns correct position for each element."""
+        ul = UniqueList(items)
+        for i, item in enumerate(ul):
+            assert ul.index(item) == i

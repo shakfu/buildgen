@@ -10,18 +10,25 @@ from buildgen.makefile.variables import Var
 
 
 class MakefileWriter:
-    """Handles writing Makefile contents."""
+    """Handles writing Makefile contents.
+
+    Buffers all writes in memory and flushes to disk on close.
+    This avoids file handle leaks and ensures atomic writes.
+    """
 
     def __init__(self, path: PathLike):
-        self.makefile = open(path, "w", encoding="utf8")
+        self.path = path
+        self.lines: list[str] = []
 
     def write(self, line: str = "") -> None:
-        """Write a line to the Makefile."""
-        print(line, file=self.makefile)
+        """Buffer a line to be written."""
+        self.lines.append(line)
 
     def close(self) -> None:
-        """Close the Makefile."""
-        self.makefile.close()
+        """Write all buffered lines to the file."""
+        with open(self.path, "w", encoding="utf-8") as f:
+            f.write("\n".join(self.lines))
+            f.write("\n")
 
 
 class MakefileGenerator(BaseGenerator):
