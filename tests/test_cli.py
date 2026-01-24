@@ -23,12 +23,13 @@ class TestCLIImport:
         assert hasattr(cli, "create_parser")
 
     def test_import_makefile_variables(self):
-        """Test that makefile variables module can be imported (VERSION parsing)."""
+        """Test that makefile variables module can be imported."""
         from buildgen.makefile import variables
 
-        assert hasattr(variables, "VERSION")
-        assert isinstance(variables.VERSION, float)
-        assert variables.VERSION > 0
+        assert hasattr(variables, "get_make_version")
+        version = variables.get_make_version()
+        assert isinstance(version, float)
+        assert version > 0
 
     def test_import_makefile_generator(self):
         """Test that makefile generator can be imported."""
