@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.16...3.31)
 project(${name} VERSION 1.0.0 LANGUAGES C)
 
-set(CMAKE_C_STANDARD 11)
+set(CMAKE_C_STANDARD ${defaults.get("c_standard", 11)})
 set(CMAKE_C_STANDARD_REQUIRED ON)
 
 add_library(${name} INTERFACE)

@@ -28,6 +28,7 @@ def cmd_new(args: argparse.Namespace) -> None:
     """Create a new project from a recipe."""
     from buildgen.skbuild.generator import SkbuildProjectGenerator
     from buildgen.cmake.project_generator import CMakeProjectGenerator, is_cmake_recipe
+    from buildgen.common.config import load_user_config
 
     name = args.name
     recipe_name = args.recipe or "cpp/executable"
@@ -43,16 +44,25 @@ def cmd_new(args: argparse.Namespace) -> None:
     # Determine output directory
     output_dir = Path(args.output) if args.output else Path(name)
 
+    # Load user config
+    user_config = load_user_config()
+
+    # Apply defaults from user config: only when --env was not explicitly passed
+    env_tool = getattr(args, "env", None)
+    if env_tool is None:
+        env_tool = user_config.defaults.get("env_tool", "uv")
+
     # Configurable recipes emit config first
     if recipe.configurable:
-        _generate_config_file(recipe, name, output_dir)
+        _generate_config_file(recipe, name, output_dir, user_config=user_config)
         return
 
     # Handle scikit-build-core templates (py/* recipes)
     if recipe.build_system == "skbuild":
         skbuild_type = f"skbuild-{recipe.framework}"
-        env_tool = getattr(args, "env", "uv")
-        gen = SkbuildProjectGenerator(name, skbuild_type, output_dir, env_tool=env_tool)
+        gen = SkbuildProjectGenerator(
+            name, skbuild_type, output_dir, env_tool=env_tool, user_config=user_config
+        )
         created = gen.generate()
         print(f"Created {recipe.name} project: {gen.output_dir}/")
         print(f"  (using {env_tool} for Makefile commands)")
@@ -63,7 +73,9 @@ def cmd_new(args: argparse.Namespace) -> None:
 
     # Handle CMake-based templates (cpp/* and c/* recipes)
     if is_cmake_recipe(recipe_name):
-        cmake_gen = CMakeProjectGenerator(name, recipe_name, output_dir)
+        cmake_gen = CMakeProjectGenerator(
+            name, recipe_name, output_dir, user_config=user_config
+        )
         created = cmake_gen.generate()
         print(f"Created {recipe.name} project: {cmake_gen.output_dir}/")
         for path in created:
@@ -81,8 +93,11 @@ def _generate_config_file(
     output_dir: Path,
     *,
     options: Optional[dict[str, Any]] = None,
+    user_config: Optional["UserConfig"] = None,
 ) -> None:
     """Render the config template for configurable recipes."""
+    from buildgen.common.config import UserConfig
+
     if not recipe.config_template:
         raise ValueError(
             f"Recipe {recipe.name} is marked configurable but lacks config_template"
@@ -97,7 +112,15 @@ def _generate_config_file(
     if options:
         base_options.update(options)
 
-    content = template.render(name=name, options=base_options)
+    render_args: dict[str, Any] = {"name": name, "options": base_options}
+    # Merge user config context (user info + defaults)
+    if isinstance(user_config, UserConfig):
+        render_args.update(user_config.to_template_context())
+    else:
+        render_args.setdefault("user", {})
+        render_args.setdefault("defaults", {})
+
+    content = template.render(**render_args)
     config_filename = Path(recipe.config_template).with_suffix("")
     config_path = output_dir / config_filename
     config_path.write_text(content)
@@ -399,6 +422,7 @@ targets:
 def cmd_render(args: argparse.Namespace) -> None:
     """Render a configurable recipe config into a full project."""
     from buildgen.skbuild.generator import SkbuildProjectGenerator, ENV_TOOLS
+    from buildgen.common.config import load_user_config
 
     config_path = Path(args.config)
     if not config_path.exists():
@@ -430,12 +454,22 @@ def cmd_render(args: argparse.Namespace) -> None:
         print("Error: Config file must include 'name'", file=sys.stderr)
         sys.exit(1)
 
+    # Load user config
+    user_config = load_user_config()
+
     output_dir = Path(args.output) if args.output else config_path.parent / project_name
     options = _prepare_recipe_options(
         recipe, data.get("options", {}), override_env=getattr(args, "env", None)
     )
 
-    env_tool = options.get("env", "uv")
+    # Explicit --env flag overrides options; options override user config default
+    explicit_env = getattr(args, "env", None)
+    if explicit_env:
+        env_tool = explicit_env
+    else:
+        env_tool = options.get("env", None) or user_config.defaults.get(
+            "env_tool", "uv"
+        )
     if env_tool not in ENV_TOOLS:
         valid = ", ".join(ENV_TOOLS)
         print(
@@ -451,6 +485,7 @@ def cmd_render(args: argparse.Namespace) -> None:
         output_dir,
         env_tool=env_tool,
         context={"options": options},
+        user_config=user_config,
     )
     created = gen.generate()
 
@@ -687,3 +722,48 @@ def cmd_templates_show(args: argparse.Namespace) -> None:
         # Clean up output path for display
         display_path = output_path.replace("${name}", "<name>")
         print(f"  {display_path:<30} -> ({source}) {template_path.name}")
+
+
+def cmd_config_init(args: argparse.Namespace) -> None:
+    """Create a default ~/.buildgen/config.toml."""
+    from buildgen.common.config import DEFAULT_CONFIG_PATH, CONFIG_TEMPLATE
+
+    config_path = DEFAULT_CONFIG_PATH
+    if config_path.exists():
+        print(f"Config file already exists: {config_path}", file=sys.stderr)
+        print("Remove it first if you want to re-initialize.")
+        sys.exit(1)
+
+    config_path.parent.mkdir(parents=True, exist_ok=True)
+    config_path.write_text(CONFIG_TEMPLATE)
+    print(f"Created config file: {config_path}")
+    print("Edit it to set your user info and defaults.")
+
+
+def cmd_config_show(args: argparse.Namespace) -> None:
+    """Display current resolved config."""
+    from buildgen.common.config import DEFAULT_CONFIG_PATH, load_user_config
+
+    if not DEFAULT_CONFIG_PATH.is_file():
+        print("No config file found.")
+        print(f"Run 'buildgen config init' to create {DEFAULT_CONFIG_PATH}")
+        return
+
+    cfg = load_user_config()
+    print(f"Config file: {DEFAULT_CONFIG_PATH}\n")
+    print("[user]")
+    print(f"  name  = {cfg.user_name!r}")
+    print(f"  email = {cfg.user_email!r}")
+    print("\n[defaults]")
+    if cfg.defaults:
+        for key, value in cfg.defaults.items():
+            print(f"  {key} = {value!r}")
+    else:
+        print("  (none)")
+
+
+def cmd_config_path(args: argparse.Namespace) -> None:
+    """Print the config file path."""
+    from buildgen.common.config import DEFAULT_CONFIG_PATH
+
+    print(DEFAULT_CONFIG_PATH)

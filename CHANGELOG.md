@@ -2,7 +2,43 @@
 
 All notable changes to this project will be documented in this file.
 
-## [unreleased]
+## [0.1.10]
+
+### Added
+
+- **User Configuration** (`~/.buildgen/config.toml`) - Global user-level configuration loaded via stdlib `tomllib`.
+  - `[user]` section: `name` and `email` fields for author identity
+  - `[defaults]` section: `license`, `cxx_standard`, `c_standard`, `python_version`, `env_tool`
+  - `UserConfig` dataclass and `load_user_config()` in `buildgen.common.config`
+  - User info flows into templates: LICENSE copyright, pyproject.toml `authors` field
+  - Defaults flow into templates: C/C++ standard in CMakeLists.txt, license and requires-python in pyproject.toml
+
+- **`buildgen config` subcommand**:
+  - `buildgen config init` - Creates `~/.buildgen/config.toml` with commented template (refuses to overwrite)
+  - `buildgen config show` - Displays current resolved config
+  - `buildgen config path` - Prints the config file path
+
+- **Comprehensive config tests** (`tests/test_config.py`) - 39 tests covering config loading, template integration, CLI commands, defaults wiring, license body rendering, and backward compatibility.
+
+### Fixed
+
+- **LICENSE body matches `defaults.license`** - The generated LICENSE file now renders the correct license text for MIT, BSD-2-Clause, BSD-3-Clause, ISC, and Apache-2.0. Previously, the LICENSE file always contained MIT text regardless of the configured license. Unsupported SPDX identifiers get a stub with a link to the full text.
+
+- **`--env` flag sentinel bug** - Changed argparse default for `--env` from `"uv"` to `None` so that `defaults.env_tool` from user config is only applied when the user doesn't explicitly pass `--env`. Previously, `--env uv` (explicit) was indistinguishable from the argparse default, causing user config to incorrectly override an explicit CLI choice.
+
+- **`_generate_config_file` missing context** - Configurable recipe templates (e.g., `py/pybind11-flex`) now receive user config context, enabling them to pre-fill author info and apply defaults.
+
+- **pybind11-flex `python_version` fallback inconsistency** - Changed fallback from `"3.9"` to `"3.10"` to match the base pyproject template and documentation.
+
+- **`_generate_config_file` type annotation** - Changed `user_config` parameter type from `Optional[Any]` to `Optional["UserConfig"]` for clarity.
+
+### Changed
+
+- **CMakeProjectGenerator** now accepts `context` and `user_config` parameters, and passes context to template rendering (matching SkbuildProjectGenerator's pattern).
+
+- **SkbuildProjectGenerator** now accepts an optional `user_config` parameter that merges user identity and defaults into the template context.
+
+- **Template defaults are no longer hardcoded** - C++ templates read `defaults.cxx_standard` (fallback: 17), C templates read `defaults.c_standard` (fallback: 11), pyproject.toml templates read `defaults.license` (fallback: MIT) and `defaults.python_version` (fallback: 3.10).
 
 ## [0.1.9]
 

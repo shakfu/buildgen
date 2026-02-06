@@ -12,6 +12,9 @@ from buildgen.cli.commands import (
     cmd_templates_list,
     cmd_templates_copy,
     cmd_templates_show,
+    cmd_config_init,
+    cmd_config_show,
+    cmd_config_path,
 )
 
 
@@ -52,7 +55,7 @@ Use 'buildgen list' to see available recipes.""",
         "-e",
         "--env",
         choices=["uv", "venv"],
-        default="uv",
+        default=None,
         help="Environment tool for py/* recipes (default: uv)",
     )
     parser.set_defaults(func=cmd_new)
@@ -298,6 +301,46 @@ Examples:
     show_parser.set_defaults(func=cmd_templates_show)
 
 
+def add_config_subparsers(subparsers: argparse._SubParsersAction) -> None:
+    """Add config subcommand parsers."""
+    config_parser = subparsers.add_parser(
+        "config",
+        help="Manage user configuration (~/.buildgen/config.toml)",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  buildgen config init    # Create ~/.buildgen/config.toml
+  buildgen config show    # Display current config
+  buildgen config path    # Print config file path
+        """,
+    )
+
+    config_subparsers = config_parser.add_subparsers(
+        dest="config_command", help="Config commands"
+    )
+
+    # config init
+    init_parser = config_subparsers.add_parser(
+        "init",
+        help="Create a default config file",
+    )
+    init_parser.set_defaults(func=cmd_config_init)
+
+    # config show
+    show_parser = config_subparsers.add_parser(
+        "show",
+        help="Display current resolved config",
+    )
+    show_parser.set_defaults(func=cmd_config_show)
+
+    # config path
+    path_parser = config_subparsers.add_parser(
+        "path",
+        help="Print the config file path",
+    )
+    path_parser.set_defaults(func=cmd_config_path)
+
+
 def create_parser() -> argparse.ArgumentParser:
     """Create the main CLI argument parser."""
     from buildgen import __version__
@@ -349,5 +392,6 @@ Examples:
     add_makefile_subparsers(subparsers)
     add_cmake_subparsers(subparsers)
     add_templates_subparsers(subparsers)
+    add_config_subparsers(subparsers)
 
     return parser

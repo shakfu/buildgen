@@ -4,9 +4,10 @@ Generates C/C++ projects from templates in templates/cpp/* and templates/c/*.
 """
 
 from pathlib import Path
-from typing import Optional
+from typing import Any, Dict, Optional
 
 from mako.template import Template
+from buildgen.common.config import UserConfig
 from buildgen.templates.resolver import TemplateResolver
 
 
@@ -145,6 +146,8 @@ class CMakeProjectGenerator:
         recipe: str,
         output_dir: Optional[Path] = None,
         project_dir: Optional[Path] = None,
+        context: Optional[dict[str, Any]] = None,
+        user_config: Optional[UserConfig] = None,
     ):
         """Initialize the generator.
 
@@ -153,6 +156,8 @@ class CMakeProjectGenerator:
             recipe: Recipe path (e.g., "cpp/executable", "c/static")
             output_dir: Output directory (default: current directory / name)
             project_dir: Project directory for template overrides.
+            context: Additional template context (overrides user_config values).
+            user_config: User-level config from ~/.buildgen/config.toml.
         """
         if recipe not in self.TEMPLATE_FILES:
             valid = ", ".join(sorted(self.TEMPLATE_FILES.keys()))
@@ -163,6 +168,14 @@ class CMakeProjectGenerator:
         self.output_dir = Path(output_dir) if output_dir else Path.cwd() / name
         self.project_dir = project_dir
         self.resolver = TemplateResolver(project_dir)
+
+        # Build context: user config as base, explicit context overrides
+        base_ctx: Dict[str, Any] = {"user": {}, "defaults": {}}
+        if user_config:
+            base_ctx.update(user_config.to_template_context())
+        if context:
+            base_ctx.update(context)
+        self.context: Dict[str, Any] = base_ctx
 
     def _render_path(self, path_template: str) -> Path:
         """Render a path template with the project name."""
@@ -187,7 +200,10 @@ class CMakeProjectGenerator:
     def _render_template(self, template_path: Path) -> str:
         """Load and render a template file."""
         template = Template(filename=str(template_path))
-        return template.render(name=self.name)
+        render_args: dict[str, Any] = {"name": self.name}
+        if self.context:
+            render_args.update(self.context)
+        return template.render(**render_args)
 
     def generate(self) -> list[Path]:
         """Generate all project files.

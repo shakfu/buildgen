@@ -33,6 +33,7 @@ buildgen list
 - **scikit-build-core Templates**: Python extension project scaffolding (pybind11, cython, nanobind, C)
 - **Template Customization**: Override templates per-project, per-user, or via environment variable (Mako syntax)
 - **Configurable Project Recipes**: 2-step JSON/YAML recipes which include options and which are `rendered` to generate the project infrastructure.
+- **User Configuration**: Global `~/.buildgen/config.toml` for author identity and project defaults (license, language standards, Python version, env tool)
 
 ## Usage
 
@@ -313,6 +314,47 @@ original `project.flex.json` stays wherever you edited it for future re-runs. Yo
 `buildgen render` from within the project directory as long as you point to the flex file.
 Use `--env venv` on `buildgen render` to override the config’s environment choice without
 editing the JSON/YAML.
+
+## User Configuration
+
+Set your identity and project defaults globally via `~/.buildgen/config.toml`:
+
+```bash
+# Create the config file with a commented template
+buildgen config init
+
+# View current config
+buildgen config show
+
+# Print config file path
+buildgen config path
+```
+
+### Config Format
+
+```toml
+[user]
+name = "Your Name"
+email = "you@example.com"
+
+[defaults]
+license = "MIT"
+cxx_standard = 17
+c_standard = 11
+python_version = "3.10"
+env_tool = "uv"
+```
+
+### What the config affects
+
+- **`user.name`** / **`user.email`** -- Populates the LICENSE copyright holder and `[[project.authors]]` in generated `pyproject.toml` files.
+- **`defaults.license`** -- Sets the license identifier in `pyproject.toml` (default: `MIT`).
+- **`defaults.cxx_standard`** -- Sets `CMAKE_CXX_STANDARD` in C++ CMakeLists.txt templates (default: `17`).
+- **`defaults.c_standard`** -- Sets `CMAKE_C_STANDARD` in C CMakeLists.txt templates (default: `11`).
+- **`defaults.python_version`** -- Sets `requires-python` in `pyproject.toml` (default: `3.10`).
+- **`defaults.env_tool`** -- Fallback environment tool (`uv` or `venv`) when `--env` is not explicitly passed on the command line.
+
+All defaults are optional. Without a config file, templates use their built-in fallback values.
 
 ## Template Customization
 

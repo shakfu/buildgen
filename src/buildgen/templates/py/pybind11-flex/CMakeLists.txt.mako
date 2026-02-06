@@ -1,4 +1,4 @@
-<%page args="name, options={}" />
+<%page args="name, defaults={}, options={}" />
 <%
 raw_options = locals().get("options")
 if not isinstance(raw_options, dict):
@@ -7,12 +7,13 @@ opts = raw_options
 test_framework = opts.get("test_framework", "catch2")
 build_examples = bool(opts.get("build_examples", False))
 build_cpp_tests_default = "ON" if test_framework != "none" else "OFF"
+cxx_std = defaults.get("cxx_standard", 17) if isinstance(defaults, dict) else 17
 %>
 
 cmake_minimum_required(VERSION 3.18...3.31)
 project(${"$"}{SKBUILD_PROJECT_NAME} VERSION ${"$"}{SKBUILD_PROJECT_VERSION} LANGUAGES CXX)
 
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD ${cxx_std})
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
@@ -26,7 +27,7 @@ option(BUILD_EMBEDDED_CLI "Build C++ CLI example that embeds Python" ${"ON" if b
 find_package(pybind11 CONFIG REQUIRED)
 
 pybind11_add_module(_core MODULE src/${name}/_core.cpp)
-target_compile_features(_core PRIVATE cxx_std_17)
+target_compile_features(_core PRIVATE cxx_std_${cxx_std})
 
 if(MSVC)
     target_compile_options(_core PRIVATE /W4)
@@ -50,7 +51,7 @@ if(BUILD_CPP_TESTS)
 
         add_executable(${name}_catch2 tests/native/test_module.catch2.cpp)
         target_link_libraries(${name}_catch2 PRIVATE Catch2::Catch2WithMain pybind11::embed)
-        target_compile_features(${name}_catch2 PRIVATE cxx_std_17)
+        target_compile_features(${name}_catch2 PRIVATE cxx_std_${cxx_std})
 
         include(Catch)
 <%text>
@@ -71,7 +72,7 @@ if(BUILD_CPP_TESTS)
 
         add_executable(${name}_gtest tests/native/test_module.gtest.cpp)
         target_link_libraries(${name}_gtest PRIVATE GTest::gtest_main pybind11::embed)
-        target_compile_features(${name}_gtest PRIVATE cxx_std_17)
+        target_compile_features(${name}_gtest PRIVATE cxx_std_${cxx_std})
 
         include(GoogleTest)
 <%text>
@@ -91,5 +92,5 @@ endif()
 if(BUILD_EMBEDDED_CLI)
     add_executable(${name}_cli examples/cli/main.cpp)
     target_link_libraries(${name}_cli PRIVATE pybind11::embed)
-    target_compile_features(${name}_cli PRIVATE cxx_std_17)
+    target_compile_features(${name}_cli PRIVATE cxx_std_${cxx_std})
 endif()

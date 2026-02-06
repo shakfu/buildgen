@@ -5,6 +5,7 @@ from typing import Optional, Any, Dict
 
 from mako.lookup import TemplateLookup
 from mako.template import Template
+from buildgen.common.config import UserConfig
 from buildgen.skbuild.templates import (
     SKBUILD_TYPES,
     TEMPLATE_FILES,
@@ -61,6 +62,7 @@ class SkbuildProjectGenerator:
         env_tool: str = "uv",
         project_dir: Optional[Path] = None,
         context: Optional[dict[str, Any]] = None,
+        user_config: Optional[UserConfig] = None,
     ):
         """Initialize the generator.
 
@@ -71,6 +73,8 @@ class SkbuildProjectGenerator:
             env_tool: Environment tool for Makefile ("uv" or "venv", default: "uv")
             project_dir: Project directory for template overrides. If None,
                          uses output_dir's parent for local override lookup.
+            context: Additional template context (overrides user_config values).
+            user_config: User-level config from ~/.buildgen/config.toml.
         """
         if template_type not in TEMPLATE_FILES:
             valid = ", ".join(TEMPLATE_FILES.keys())
@@ -90,7 +94,14 @@ class SkbuildProjectGenerator:
         self.output_dir = Path(output_dir) if output_dir else Path.cwd() / name
         self.env_tool = env_tool
         self.project_dir = project_dir
-        self.context: Dict[str, Any] = dict(context or {})
+
+        # Build context: user config as base, explicit context overrides
+        base_ctx: Dict[str, Any] = {"user": {}, "defaults": {}}
+        if user_config:
+            base_ctx.update(user_config.to_template_context())
+        if context:
+            base_ctx.update(context)
+        self.context: Dict[str, Any] = base_ctx
         if "options" not in self.context:
             self.context["options"] = {}
 

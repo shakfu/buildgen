@@ -14,9 +14,21 @@ def main() -> None:
         parser.print_help()
         sys.exit(1)
 
-    # Commands with direct func (new, list, test, generate)
+    # Commands with direct func (new, list, test, generate, render)
     if args.command in ("new", "list", "test", "generate", "render"):
         if hasattr(args, "func"):
+            try:
+                args.func(args)
+            except Exception as e:
+                print(f"Error: {e}", file=sys.stderr)
+                sys.exit(1)
+        return
+
+    # Handle config subcommands
+    if args.command == "config":
+        if not hasattr(args, "config_command") or not args.config_command:
+            parser.parse_args(["config", "--help"])
+        elif hasattr(args, "func"):
             try:
                 args.func(args)
             except Exception as e:

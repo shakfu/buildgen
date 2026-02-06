@@ -18,6 +18,9 @@ from buildgen.cli.commands import (
     cmd_templates_list,
     cmd_templates_copy,
     cmd_templates_show,
+    cmd_config_init,
+    cmd_config_show,
+    cmd_config_path,
 )
 
 __all__ = [
@@ -31,4 +34,7 @@ __all__ = [
     "cmd_templates_list",
     "cmd_templates_copy",
     "cmd_templates_show",
+    "cmd_config_init",
+    "cmd_config_show",
+    "cmd_config_path",
 ]

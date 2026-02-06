@@ -1,15 +1,31 @@
-<%page args="name, framework, framework_pkg, description, lang_classifier, options={}" />
+<%page args="name, framework, framework_pkg, description, lang_classifier, defaults={}, user={}, options={}" />
 <%
 # Handle optional extra build requirements
 extra_requires = f', "{framework_pkg}"' if framework_pkg else ''
+_defaults = defaults if isinstance(defaults, dict) else {}
+_license = _defaults.get("license", "MIT")
+_python_version = _defaults.get("python_version", "3.10")
 %>
 [project]
 name = "${name}"
 version = "0.1.0"
 description = "${description}"
 readme = "README.md"
-license = { text = "MIT" }
-requires-python = ">=3.10"
+license = { text = "${_license}" }
+<%
+_author_parts = []
+if user:
+    if user.get("name"):
+        _author_parts.append(f'name = "{user["name"]}"')
+    if user.get("email"):
+        _author_parts.append(f'email = "{user["email"]}"')
+%>\
+% if _author_parts:
+authors = [
+    { ${", ".join(_author_parts)} }
+]
+% endif
+requires-python = ">=${_python_version}"
 keywords = ["${framework}", "python", "extension"]
 classifiers = [
     "Development Status :: 3 - Alpha",
