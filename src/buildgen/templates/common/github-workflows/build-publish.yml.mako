@@ -27,6 +27,13 @@ on:
         default: false
         type: boolean
 
+permissions:
+  contents: read
+
+concurrency:
+  group: build-${"${{ github.workflow }}"}-${"${{ github.ref }}"}
+  cancel-in-progress: true
+
 env:
   CIBW_BUILD: "${cp_versions}"
   CIBW_SKIP: "*-musllinux_* pp*"
@@ -38,16 +45,16 @@ jobs:
     name: Build source distribution
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v5
+        uses: astral-sh/setup-uv@v7
 
       - name: Build sdist
         run: uv build --sdist
 
       - name: Upload sdist
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: sdist
           path: dist/*.tar.gz
@@ -57,7 +64,12 @@ jobs:
     name: Build wheels (Linux)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: arm64
 
       - name: Build wheels
         uses: pypa/cibuildwheel@v3.3.1
@@ -65,7 +77,7 @@ jobs:
           CIBW_ARCHS_LINUX: x86_64 aarch64
 
       - name: Upload wheels
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: wheels-linux
           path: wheelhouse/*.whl
@@ -75,7 +87,7 @@ jobs:
     name: Build wheels (macOS)
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Build wheels
         uses: pypa/cibuildwheel@v3.3.1
@@ -83,7 +95,7 @@ jobs:
           CIBW_ARCHS_MACOS: x86_64 arm64
 
       - name: Upload wheels
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: wheels-macos
           path: wheelhouse/*.whl
@@ -93,7 +105,7 @@ jobs:
     name: Build wheels (Windows)
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Build wheels
         uses: pypa/cibuildwheel@v3.3.1
@@ -101,7 +113,7 @@ jobs:
           CIBW_ARCHS_WINDOWS: AMD64
 
       - name: Upload wheels
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: wheels-windows
           path: wheelhouse/*.whl
@@ -113,25 +125,25 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Download sdist
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: sdist
           path: dist/
 
       - name: Download Linux wheels
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: wheels-linux
           path: dist/
 
       - name: Download macOS wheels
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: wheels-macos
           path: dist/
 
       - name: Download Windows wheels
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: wheels-windows
           path: dist/
@@ -145,7 +157,7 @@ jobs:
           echo "=== Sdist count: $(ls dist/*.tar.gz 2>/dev/null | wc -l) ==="
 
       - name: Upload combined artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: all-dist
           path: dist/
@@ -163,7 +175,7 @@ jobs:
       id-token: write
     steps:
       - name: Download all artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: all-dist
           path: dist/
@@ -185,7 +197,7 @@ jobs:
       id-token: write
     steps:
       - name: Download all artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: all-dist
           path: dist/
@@ -205,7 +217,7 @@ jobs:
       id-token: write
     steps:
       - name: Download all artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: all-dist
           path: dist/
