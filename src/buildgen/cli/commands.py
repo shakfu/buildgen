@@ -7,7 +7,10 @@ import re
 import shutil
 import sys
 from pathlib import Path
-from typing import Any, Optional
+from typing import TYPE_CHECKING, Any, Optional
+
+if TYPE_CHECKING:
+    from buildgen.common.config import UserConfig
 
 from mako.template import Template
 

@@ -509,9 +509,7 @@ class TestLicenseBodyMatchesConfig:
     def _generate_license(self, tmp_path, license_id):
         from buildgen.skbuild.generator import SkbuildProjectGenerator
 
-        user_cfg = UserConfig(
-            user_name="Test Author", defaults={"license": license_id}
-        )
+        user_cfg = UserConfig(user_name="Test Author", defaults={"license": license_id})
         gen = SkbuildProjectGenerator(
             "myext", "skbuild-pybind11", tmp_path, user_config=user_cfg
         )

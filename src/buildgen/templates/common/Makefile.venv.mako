@@ -42,7 +42,7 @@ format:
 
 # Type check with mypy
 typecheck:
-	@$(PYTHON) -m mypy src/${name}/__init__.py tests/ --exclude '.venv'
+	@$(PYTHON) -m mypy src/${name} --exclude '.venv'
 
 # Run a full quality assurance check
 qa: test lint typecheck format

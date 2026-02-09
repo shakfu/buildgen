@@ -28,7 +28,7 @@ on:
         type: boolean
 
 env:
-  CIBW_BUILD: "${cp_versions}-*"
+  CIBW_BUILD: "${cp_versions}"
   CIBW_SKIP: "*-musllinux_* pp*"
   CIBW_TEST_REQUIRES: pytest
   CIBW_TEST_COMMAND: pytest {project}/tests -v
@@ -78,7 +78,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Build wheels
-        uses: pypa/cibuildwheel@v2.23
+        uses: pypa/cibuildwheel@v3.3.1
         env:
           CIBW_ARCHS_MACOS: x86_64 arm64
 
@@ -96,7 +96,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Build wheels
-        uses: pypa/cibuildwheel@v2.23
+        uses: pypa/cibuildwheel@v3.3.1
         env:
           CIBW_ARCHS_WINDOWS: AMD64
 
