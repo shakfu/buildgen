@@ -58,6 +58,12 @@ Use 'buildgen list' to see available recipes.""",
         default=None,
         help="Environment tool for py/* recipes (default: uv)",
     )
+    parser.add_argument(
+        "--no-update-deps",
+        action="store_true",
+        default=False,
+        help="Skip resolving latest dependency versions from PyPI",
+    )
     parser.set_defaults(func=cmd_new)
 
 
@@ -211,6 +217,12 @@ Examples:
         "--env",
         choices=["uv", "venv"],
         help="Override environment tool from the config options",
+    )
+    parser.add_argument(
+        "--no-update-deps",
+        action="store_true",
+        default=False,
+        help="Skip resolving latest dependency versions from PyPI",
     )
     parser.set_defaults(func=cmd_render)
 

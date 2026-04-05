@@ -34,6 +34,7 @@ buildgen list
 - **Template Customization**: Override templates per-project, per-user, or via environment variable (Mako syntax)
 - **Configurable Project Recipes**: 2-step JSON/YAML recipes which include options and which are `rendered` to generate the project infrastructure.
 - **User Configuration**: Global `~/.buildgen/config.toml` for author identity and project defaults (license, language standards, Python version, env tool)
+- **Dependency Version Resolution**: Automatically resolves latest dependency versions from PyPI at generation time, with offline fallback and per-user version pinning
 
 ## Usage
 
@@ -343,6 +344,13 @@ cxx_standard = 17
 c_standard = 11
 python_version = "3.10"
 env_tool = "uv"
+
+[deps]
+# Pin dependency versions used in generated projects.
+# These override both PyPI resolution and bundled defaults.
+# Omitted packages are resolved normally.
+# ruff = "0.14.0"
+# mypy = "1.18.0"
 ```
 
 ### What the config affects
@@ -353,8 +361,27 @@ env_tool = "uv"
 - **`defaults.c_standard`** -- Sets `CMAKE_C_STANDARD` in C CMakeLists.txt templates (default: `11`).
 - **`defaults.python_version`** -- Sets `requires-python` in `pyproject.toml` (default: `3.10`).
 - **`defaults.env_tool`** -- Fallback environment tool (`uv` or `venv`) when `--env` is not explicitly passed on the command line.
+- **`deps.<package>`** -- Pin a specific version for a dev dependency or build-system requirement. Overrides both PyPI resolution and bundled defaults.
 
 All defaults are optional. Without a config file, templates use their built-in fallback values.
+
+## Dependency Version Resolution
+
+Generated Python projects (`py/*` recipes) include dev dependencies (ruff, mypy, pytest, etc.) and build-system requirements (scikit-build-core). By default, `buildgen` resolves the latest versions of these packages from PyPI at generation time, so scaffolded projects start with current tooling.
+
+The resolution order is:
+
+1. **User config `[deps]`** -- Pinned versions in `~/.buildgen/config.toml` always win
+2. **PyPI latest** -- Queried at generation time (default behavior)
+3. **Bundled defaults** -- Fallback when offline or on error
+
+To skip PyPI resolution entirely (e.g., in CI or offline environments):
+
+```bash
+buildgen new myext -r py/pybind11 --no-update-deps
+```
+
+This uses the bundled default versions (still overridden by any `[deps]` pins in user config).
 
 ## Template Customization
 

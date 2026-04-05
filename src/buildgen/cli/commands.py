@@ -60,11 +60,18 @@ def cmd_new(args: argparse.Namespace) -> None:
         _generate_config_file(recipe, name, output_dir, user_config=user_config)
         return
 
+    update_deps = not getattr(args, "no_update_deps", False)
+
     # Handle scikit-build-core templates (py/* recipes)
     if recipe.build_system == "skbuild":
         skbuild_type = f"skbuild-{recipe.framework}"
         gen = SkbuildProjectGenerator(
-            name, skbuild_type, output_dir, env_tool=env_tool, user_config=user_config
+            name,
+            skbuild_type,
+            output_dir,
+            env_tool=env_tool,
+            user_config=user_config,
+            update_deps=update_deps,
         )
         created = gen.generate()
         print(f"Created {recipe.name} project: {gen.output_dir}/")
@@ -218,7 +225,11 @@ def cmd_test(args: argparse.Namespace) -> None:
             if recipe.build_system == "skbuild":
                 skbuild_type = f"skbuild-{recipe.framework}"
                 gen = SkbuildProjectGenerator(
-                    project_name, skbuild_type, project_dir, env_tool="uv"
+                    project_name,
+                    skbuild_type,
+                    project_dir,
+                    env_tool="uv",
+                    update_deps=False,
                 )
                 gen.generate()
             elif is_cmake_recipe(recipe_name):
@@ -480,6 +491,7 @@ def cmd_render(args: argparse.Namespace) -> None:
         )
         sys.exit(1)
 
+    update_deps = not getattr(args, "no_update_deps", False)
     skbuild_type = f"skbuild-{recipe.framework}"
     output_dir.mkdir(parents=True, exist_ok=True)
     gen = SkbuildProjectGenerator(
@@ -489,6 +501,7 @@ def cmd_render(args: argparse.Namespace) -> None:
         env_tool=env_tool,
         context={"options": options},
         user_config=user_config,
+        update_deps=update_deps,
     )
     created = gen.generate()
 
@@ -760,6 +773,12 @@ def cmd_config_show(args: argparse.Namespace) -> None:
     print("\n[defaults]")
     if cfg.defaults:
         for key, value in cfg.defaults.items():
+            print(f"  {key} = {value!r}")
+    else:
+        print("  (none)")
+    print("\n[deps]")
+    if cfg.deps:
+        for key, value in cfg.deps.items():
             print(f"  {key} = {value!r}")
     else:
         print("  (none)")

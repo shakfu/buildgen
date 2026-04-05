@@ -6,6 +6,7 @@ from typing import Optional, Any, Dict
 from mako.lookup import TemplateLookup
 from mako.template import Template
 from buildgen.common.config import UserConfig
+from buildgen.common.deps import get_default_versions, resolve_latest_versions
 from buildgen.skbuild.templates import (
     SKBUILD_TYPES,
     TEMPLATE_FILES,
@@ -63,6 +64,7 @@ class SkbuildProjectGenerator:
         project_dir: Optional[Path] = None,
         context: Optional[dict[str, Any]] = None,
         user_config: Optional[UserConfig] = None,
+        update_deps: bool = True,
     ):
         """Initialize the generator.
 
@@ -75,6 +77,8 @@ class SkbuildProjectGenerator:
                          uses output_dir's parent for local override lookup.
             context: Additional template context (overrides user_config values).
             user_config: User-level config from ~/.buildgen/config.toml.
+            update_deps: Resolve latest dependency versions from PyPI
+                (default True). Set False to use bundled defaults.
         """
         if template_type not in TEMPLATE_FILES:
             valid = ", ".join(TEMPLATE_FILES.keys())
@@ -104,6 +108,15 @@ class SkbuildProjectGenerator:
         self.context: Dict[str, Any] = base_ctx
         if "options" not in self.context:
             self.context["options"] = {}
+
+        # Resolve dependency versions: user config pins > PyPI/defaults
+        if update_deps:
+            dep_versions = resolve_latest_versions()
+        else:
+            dep_versions = get_default_versions()
+        if user_config and user_config.deps:
+            dep_versions.update(user_config.deps)
+        self.context["dep_versions"] = dep_versions
 
         # Get resolved template paths (with override support)
         self.resolved_templates = resolve_template_files(

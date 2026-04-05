@@ -2,6 +2,30 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.11]
+
+### Added
+
+- **Dependency Version Resolution** - Generated Python projects now resolve the latest dependency versions from PyPI at generation time instead of using hardcoded version pins.
+  - New module `buildgen.common.deps` with `resolve_latest_versions()` (queries PyPI via stdlib `urllib`) and `get_default_versions()` (offline fallback)
+  - Resolution order: user config `[deps]` > PyPI latest > bundled defaults
+  - Applies to all dev dependencies (ruff, mypy, pytest, pytest-cov, twine, pybind11-stubgen) and build-system requirements (scikit-build-core)
+  - Graceful per-package fallback: if any individual PyPI request fails, the bundled default is used for that package
+
+- **`[deps]` section in user config** (`~/.buildgen/config.toml`) - Pin specific dependency versions that override both PyPI resolution and bundled defaults. Unpinned packages are resolved normally.
+  - `buildgen config show` now displays the `[deps]` section
+  - `buildgen config init` template includes commented `[deps]` examples
+
+- **`--no-update-deps` CLI flag** - Skip PyPI resolution on `buildgen new` and `buildgen render` for offline or reproducible generation. Bundled defaults are used instead (still overridden by user config `[deps]` pins).
+
+### Changed
+
+- **`SkbuildProjectGenerator`** now accepts an `update_deps` parameter (default: `True`). Templates receive a `dep_versions` dict in their context instead of containing hardcoded version strings.
+
+- **`buildgen test`** uses `update_deps=False` internally to avoid network calls during recipe testing.
+
+- **Mako templates** (`pyproject.base.toml.mako`, `py/pybind11-flex/pyproject.toml.mako`) now use `dep_versions` context variable for all version pins instead of hardcoded strings.
+
 ## [0.1.10]
 
 ### Added

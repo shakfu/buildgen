@@ -1,10 +1,11 @@
-<%page args="name, framework, framework_pkg, description, lang_classifier, defaults={}, user={}, options={}" />
+<%page args="name, framework, framework_pkg, description, lang_classifier, defaults={}, user={}, options={}, dep_versions={}" />
 <%
 # Handle optional extra build requirements
 extra_requires = f', "{framework_pkg}"' if framework_pkg else ''
 _defaults = defaults if isinstance(defaults, dict) else {}
 _license = _defaults.get("license", "MIT")
 _python_version = _defaults.get("python_version", "3.10")
+_dv = dep_versions if isinstance(dep_versions, dict) else {}
 %>
 [project]
 name = "${name}"
@@ -41,15 +42,15 @@ classifiers = [
 
 [dependency-groups]
 dev = [
-    "mypy>=1.19.1",
-    "pytest>=8.4.2",
-    "pytest-cov>=7.0.0",
-    "ruff>=0.14.9",
-    "twine>=6.2.0",
+    "mypy>=${_dv.get('mypy', '1.19.1')}",
+    "pytest>=${_dv.get('pytest', '8.4.2')}",
+    "pytest-cov>=${_dv.get('pytest-cov', '7.0.0')}",
+    "ruff>=${_dv.get('ruff', '0.14.9')}",
+    "twine>=${_dv.get('twine', '6.2.0')}",
 ]
 
 [build-system]
-requires = ["scikit-build-core>=0.8"${extra_requires}]
+requires = ["scikit-build-core>=${_dv.get('scikit-build-core', '0.8')}"${extra_requires}]
 build-backend = "scikit_build_core.build"
 
 [tool.scikit-build]

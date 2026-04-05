@@ -21,6 +21,15 @@ CONFIG_TEMPLATE = """\
 # c_standard = 11
 # python_version = "3.10"
 # env_tool = "uv"
+
+[deps]
+# Pin dependency versions used in generated projects.
+# These override both PyPI resolution and bundled defaults.
+# Omitted packages are resolved normally.
+# ruff = "0.14.0"
+# mypy = "1.18.0"
+# pytest = "8.4.0"
+# scikit-build-core = "0.8"
 """
 
 
@@ -31,6 +40,7 @@ class UserConfig:
     user_name: str = ""
     user_email: str = ""
     defaults: dict[str, Any] = field(default_factory=dict)
+    deps: dict[str, str] = field(default_factory=dict)
 
     def to_template_context(self) -> dict[str, Any]:
         """Return a dict suitable for merging into template render context."""
@@ -66,9 +76,13 @@ def load_user_config(path: Path | None = None) -> UserConfig:
 
     user_section = data.get("user", {})
     defaults_section = data.get("defaults", {})
+    deps_section = data.get("deps", {})
 
     return UserConfig(
         user_name=str(user_section.get("name", "")),
         user_email=str(user_section.get("email", "")),
         defaults=dict(defaults_section) if isinstance(defaults_section, dict) else {},
+        deps={str(k): str(v) for k, v in deps_section.items()}
+        if isinstance(deps_section, dict)
+        else {},
     )

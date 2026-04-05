@@ -1,4 +1,4 @@
-<%page args="name, defaults={}, user={}, options={}" />
+<%page args="name, defaults={}, user={}, options={}, dep_versions={}" />
 <%
 raw_options = locals().get("options")
 if not isinstance(raw_options, dict):
@@ -10,6 +10,7 @@ build_cpp_tests = test_framework != "none"
 _defaults = defaults if isinstance(defaults, dict) else {}
 _license = _defaults.get("license", "MIT")
 _python_version = _defaults.get("python_version", "3.10")
+_dv = dep_versions if isinstance(dep_versions, dict) else {}
 
 _author_parts = []
 if user and isinstance(user, dict):
@@ -40,12 +41,12 @@ classifiers = [
 
 [dependency-groups]
 dev = [
-    "mypy>=1.19.1",
-    "pybind11-stubgen>=0.14",
-    "pytest>=8.4.2",
-    "pytest-cov>=7.0.0",
-    "ruff>=0.14.9",
-    "twine>=6.2.0",
+    "mypy>=${_dv.get('mypy', '1.19.1')}",
+    "pybind11-stubgen>=${_dv.get('pybind11-stubgen', '0.14')}",
+    "pytest>=${_dv.get('pytest', '8.4.2')}",
+    "pytest-cov>=${_dv.get('pytest-cov', '7.0.0')}",
+    "ruff>=${_dv.get('ruff', '0.14.9')}",
+    "twine>=${_dv.get('twine', '6.2.0')}",
 ]
 
 [build-system]

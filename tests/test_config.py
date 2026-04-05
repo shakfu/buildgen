@@ -19,6 +19,7 @@ class TestUserConfig:
         assert cfg.user_name == ""
         assert cfg.user_email == ""
         assert cfg.defaults == {}
+        assert cfg.deps == {}
 
     def test_to_template_context(self):
         cfg = UserConfig(
@@ -50,6 +51,7 @@ class TestLoadUserConfig:
         assert cfg.user_name == ""
         assert cfg.user_email == ""
         assert cfg.defaults == {}
+        assert cfg.deps == {}
 
     def test_load_valid_config(self, tmp_path):
         """Parses both [user] and [defaults] sections correctly."""
@@ -105,6 +107,20 @@ class TestLoadUserConfig:
         assert cfg.user_name == ""
         assert cfg.user_email == ""
         assert cfg.defaults == {"env_tool": "venv"}
+
+    def test_load_config_with_deps(self, tmp_path):
+        """Parses [deps] section correctly."""
+        config_file = tmp_path / "config.toml"
+        config_file.write_text(
+            textwrap.dedent("""\
+            [deps]
+            ruff = "0.10.0"
+            mypy = "1.15.0"
+        """)
+        )
+
+        cfg = load_user_config(config_file)
+        assert cfg.deps == {"ruff": "0.10.0", "mypy": "1.15.0"}
 
     def test_load_empty_config(self, tmp_path):
         """Handles empty TOML file gracefully."""
@@ -262,6 +278,7 @@ class TestConfigCLICommands:
         content = config_path.read_text()
         assert "[user]" in content
         assert "[defaults]" in content
+        assert "[deps]" in content
 
     def test_config_init_no_overwrite(self, tmp_path, monkeypatch):
         from buildgen.cli.commands import cmd_config_init
@@ -304,6 +321,9 @@ class TestConfigCLICommands:
 
             [defaults]
             env_tool = "venv"
+
+            [deps]
+            ruff = "0.10.0"
         """)
         )
         monkeypatch.setattr(config_mod, "DEFAULT_CONFIG_PATH", config_path)
@@ -315,6 +335,8 @@ class TestConfigCLICommands:
         assert "'Tester'" in output
         assert "'test@test.com'" in output
         assert "'venv'" in output
+        assert "[deps]" in output
+        assert "'0.10.0'" in output
 
     def test_config_path(self, capsys):
         from buildgen.cli.commands import cmd_config_path
