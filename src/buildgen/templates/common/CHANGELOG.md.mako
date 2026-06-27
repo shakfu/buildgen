@@ -1,3 +1,10 @@
+<%
+from datetime import datetime
+today = datetime.now().strftime("%Y-%m-%d")
+# Mako treats a line-leading "##" as a comment, so emit Markdown headings via vars.
+h2 = "##"
+h3 = "###"
+%>\
 # Changelog
 
 All notable changes to this project will be documented in this file.
@@ -5,11 +12,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+${h2} [Unreleased]
 
-## [0.1.0] - Initial Release
+${h2} [0.1.0] - ${today}
 
-### Added
+${h3} Added
 
 - Initial project structure
 - Core module with example functions

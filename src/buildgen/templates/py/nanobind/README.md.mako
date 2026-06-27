@@ -2,7 +2,7 @@
 
 A Python extension module built with nanobind.
 
-## Quick Start
+${"##"} Quick Start
 
 ```bash
 uv sync

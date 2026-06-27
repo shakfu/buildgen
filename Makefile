@@ -1,5 +1,6 @@
 .PHONY: all test coverage coverage-html lint format format-check typecheck \
-		build check publish publish-test clean qa
+		build check publish publish-test clean qa \
+		update-actions update-actions-write
 
 all: test
 
@@ -52,6 +53,15 @@ publish: check
 publish-test: check
 	@echo "publishing to TestPyPI"
 	@uv run twine upload --repository testpypi dist/*
+
+# GitHub Actions maintenance
+update-actions:
+	@echo "checking workflow actions for updates (dry run)"
+	@uv run python scripts/update_workflow_actions.py
+
+update-actions-write:
+	@echo "updating workflow actions to latest"
+	@uv run python scripts/update_workflow_actions.py --write
 
 clean:
 	@find . | grep -E "(__pycache__|\.pyc|\.pyo$$)" | xargs rm -rf

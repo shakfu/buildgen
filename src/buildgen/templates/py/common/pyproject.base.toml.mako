@@ -6,6 +6,9 @@ _defaults = defaults if isinstance(defaults, dict) else {}
 _license = _defaults.get("license", "MIT")
 _python_version = _defaults.get("python_version", "3.10")
 _dv = dep_versions if isinstance(dep_versions, dict) else {}
+# Python version classifiers span the requires-python floor up to the latest known release
+_py_min_minor = int(_python_version.split(".")[1])
+_py_max_minor = max(14, _py_min_minor)
 %>
 [project]
 name = "${name}"
@@ -31,11 +34,9 @@ keywords = ["${framework}", "python", "extension"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.10",
-    "Programming Language :: Python :: 3.11",
-    "Programming Language :: Python :: 3.12",
-    "Programming Language :: Python :: 3.13",
-    "Programming Language :: Python :: 3.14",
+% for _minor in range(_py_min_minor, _py_max_minor + 1):
+    "Programming Language :: Python :: 3.${_minor}",
+% endfor
     "Programming Language :: ${lang_classifier}",
     "Typing :: Typed",
 ]
@@ -50,7 +51,7 @@ dev = [
 ]
 
 [build-system]
-requires = ["scikit-build-core>=${_dv.get('scikit-build-core', '0.8')}"${extra_requires}]
+requires = ["scikit-build-core>=${_dv.get('scikit-build-core', '0.12')}"${extra_requires}]
 build-backend = "scikit_build_core.build"
 
 [tool.scikit-build]

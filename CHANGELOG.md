@@ -2,6 +2,60 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.12]
+
+### Added
+
+- **`scripts/update_workflow_actions.py`** - Zero-dependency maintenance script that scans buildgen's own workflows (`.github/workflows`) and the generated-project workflow templates (`**/github-workflows`), resolves each GitHub Action's latest release via the `gh` CLI (with an `api.github.com` fallback honoring `GITHUB_TOKEN`), and rewrites the pins.
+  - Dry run by default; `--write` applies changes; `--style full` pins to exact `vN.N.N` tags instead of the default major `vN`.
+  - Only rewrites version tags and commit SHAs; intentionally leaves branch/floating refs such as `pypa/gh-action-pypi-publish@release/v1` untouched.
+
+- **`make update-actions` / `make update-actions-write`** - Makefile targets wrapping the updater (dry run and apply).
+
+- **Generated C/C++ libraries are now consumable via `find_package`** - the `static`, `shared`, `header-only`, and `library-with-tests` recipes install a CMake package config with a `write_basic_package_version_file` version file and a namespaced `<name>::<name>` ALIAS target (verified end-to-end with a consumer `find_package(<name> <ver> CONFIG REQUIRED)`).
+
+- **`lint-check` / `format-check` Makefile targets** added to generated Python projects (non-mutating ruff checks).
+
+### Changed
+
+- **GitHub Actions versions** updated to latest across buildgen's own CI and the generated-project workflow templates (`ci.yml.mako`, `build-publish.yml.mako`): `setup-uv` to `@v8` (standardized from a commit SHA pin), `cibuildwheel` to `@v4`, `codecov-action` to `@v7`, `setup-qemu-action` to `@v4`. All action references are normalized to consistent major-version tags.
+
+- **Build-system version floors** raised: `uv_build` to `>=0.11.25,<0.12`, and the default `scikit-build-core` floor (offline/`--no-update-deps` generation) from `0.8` to `0.12`.
+
+- **Generated `qa` target is now non-mutating** - it runs `lint-check`, `format-check`, `typecheck`, and `test` (mirroring CI) instead of the auto-fixing `lint`/`format`, so a QA gate no longer rewrites source.
+
+- **CI hardening in generated workflows** - the codecov upload now passes a `CODECOV_TOKEN` secret, and the TestPyPI publish uses `skip-existing: true` so a re-tag no longer errors and blocks the subsequent PyPI publish.
+
+- **Python trove classifiers are generated from `requires-python`** - `Programming Language :: Python :: 3.x` entries now span the `python_version` floor up to the latest known release instead of a hardcoded list, in both `pyproject.base` and `pybind11-flex`.
+
+- **`header-only` CMake recipes** now use `target_compile_features(<name> INTERFACE cxx_std/c_std)` instead of setting a global `CMAKE_*_STANDARD` that did not propagate to consumers.
+
+- **`gitignore.python`** now ignores `.coverage`, `coverage.xml`, and `htmlcov/`.
+
+### Fixed
+
+- **CMake `.gitignore` no longer ignores the generated `Makefile` frontend** - `gitignore.cmake.mako` previously listed `Makefile` and `*.cmake`, which excluded the tracked root `Makefile` frontend (and legitimate `cmake/*.cmake` modules) from version control. Generated projects use out-of-source `build/`, so these entries were both wrong.
+
+- **Project names are validated for C/C++ recipes** - `CMakeProjectGenerator` now rejects names that are not valid identifiers, mirroring the existing skbuild check. Previously a name like `my-lib` produced invalid C++ (`namespace my-lib`, header guard `MY-LIB_LIB_HPP`).
+
+- **CI type-checks the whole package** - the generated `ci.yml` mypy step now runs `mypy src/<name> tests/` instead of only `src/<name>/__init__.py` (which silently skipped the rest of the package and diverged from the Makefile).
+
+- **Portable `sed` in the Makefile `release` target** - replaced macOS-only `sed -i ''` (which fails on GNU sed/Linux) with a temp-file rewrite in `Makefile.uv` and `Makefile.venv`.
+
+- **Generated workflow Python versions track `requires-python`** - `ci.yml.mako` and `build-publish.yml.mako` now derive their Python floor from `defaults.python_version` (the same source as `requires-python`) instead of a hardcoded `3.9`, so the CI matrix and cibuildwheel no longer target versions below the package's declared minimum. The newest matrix leg is clamped to the floor and deduplicated.
+
+- **Sample executables compile cleanly under `-Wall -Wextra`** - the `executable`, `app-with-lib`, and `full` C/C++ mains used `int main(int argc, char* argv[])` without referencing the arguments, warning under the templates' own flags; they now use `int main(void)` / `int main()`.
+
+- **`pybind11-flex` pyproject aligned with the shared base** - its `scikit-build-core` build requirement now uses the resolved `dep_versions` floor instead of a hardcoded `>=0.12`, the redundant `pyproject-metadata` build requirement was removed, and the trove classifiers (development status, Python versions) were synced with `pyproject.base`.
+
+- **Markdown headings were silently stripped from generated files** - Mako treats a line-leading `##` as a comment, so every `##`/`###` heading was dropped from the generated `CHANGELOG.md` (3 headings) and the five extension `README.md` files (`## Quick Start`). Headings are now emitted so they render correctly. This was masked because tests only asserted file existence.
+
+- **`CHANGELOG.md` seed uses a Keep a Changelog date** - the `## [0.1.0]` entry is dated with the generation date instead of `- Initial Release`.
+
+- **`full` CMake recipes no longer require Threads** - dropped the gratuitous `find_package(Threads REQUIRED)` / `Threads::Threads` link that no generated source used.
+
+- **venv Makefile `upgrade`** now installs `build`, which `wheel`/`sdist` require.
+
 ## [0.1.11]
 
 ### Added

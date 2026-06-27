@@ -2,7 +2,7 @@
 
 A Python extension module built with pybind11.
 
-## Quick Start
+${"##"} Quick Start
 
 ```bash
 uv sync

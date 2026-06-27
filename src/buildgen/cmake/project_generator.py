@@ -163,6 +163,14 @@ class CMakeProjectGenerator:
             valid = ", ".join(sorted(self.TEMPLATE_FILES.keys()))
             raise ValueError(f"Invalid recipe: {recipe}. Valid: {valid}")
 
+        # The name is substituted into C/C++ namespaces, header guards, and
+        # symbol prefixes, so it must be a valid identifier (e.g. "my-lib"
+        # would produce "namespace my-lib" and "MY-LIB_LIB_HPP").
+        if not name.isidentifier():
+            raise ValueError(
+                f"Invalid project name: {name}. Must be a valid C/C++ identifier."
+            )
+
         self.name = name
         self.recipe = recipe
         self.output_dir = Path(output_dir) if output_dir else Path.cwd() / name

@@ -11,6 +11,8 @@ _defaults = defaults if isinstance(defaults, dict) else {}
 _license = _defaults.get("license", "MIT")
 _python_version = _defaults.get("python_version", "3.10")
 _dv = dep_versions if isinstance(dep_versions, dict) else {}
+_py_min_minor = int(_python_version.split(".")[1])
+_py_max_minor = max(14, _py_min_minor)
 
 _author_parts = []
 if user and isinstance(user, dict):
@@ -34,7 +36,11 @@ authors = [
 % endif
 keywords = ["pybind11", "catch2", "gtest", "scikit-build"]
 classifiers = [
+    "Development Status :: 3 - Alpha",
     "Programming Language :: Python :: 3",
+% for _minor in range(_py_min_minor, _py_max_minor + 1):
+    "Programming Language :: Python :: 3.${_minor}",
+% endfor
     "Programming Language :: C++",
     "Typing :: Typed",
 ]
@@ -50,7 +56,7 @@ dev = [
 ]
 
 [build-system]
-requires = ["scikit-build-core", "pybind11", "pyproject-metadata"]
+requires = ["scikit-build-core>=${_dv.get('scikit-build-core', '0.12')}", "pybind11"]
 build-backend = "scikit_build_core.build"
 
 [tool.scikit-build]

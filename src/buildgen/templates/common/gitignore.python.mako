@@ -18,6 +18,11 @@ __pycache__/
 .mypy_cache/
 .ruff_cache/
 
+# Coverage
+.coverage
+coverage.xml
+htmlcov/
+
 # CMake
 CMakeCache.txt
 CMakeFiles/

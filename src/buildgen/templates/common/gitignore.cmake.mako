@@ -2,12 +2,11 @@
 build/
 cmake-build-*/
 
-# CMake generated
+# CMake generated (out-of-source builds live in build/; the root Makefile
+# frontend is intentionally tracked, so it is not ignored here)
 CMakeCache.txt
 CMakeFiles/
 cmake_install.cmake
-Makefile
-*.cmake
 
 # Compiled objects
 *.o

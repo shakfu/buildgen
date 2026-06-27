@@ -5,8 +5,6 @@ set(CMAKE_C_STANDARD ${defaults.get("c_standard", 11)})
 set(CMAKE_C_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-find_package(Threads REQUIRED)
-
 # Library
 add_library(${name}_lib STATIC src/lib.c)
 
@@ -19,7 +17,7 @@ target_compile_options(${name}_lib PRIVATE -Wall -Wextra)
 
 # Executable
 add_executable(${name} src/main.c)
-target_link_libraries(${name} PRIVATE ${name}_lib Threads::Threads)
+target_link_libraries(${name} PRIVATE ${name}_lib)
 target_compile_options(${name} PRIVATE -Wall -Wextra)
 
 # Tests

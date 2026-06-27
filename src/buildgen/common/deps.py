@@ -19,7 +19,7 @@ DEFAULT_VERSIONS: dict[str, str] = {
     "ruff": "0.14.9",
     "twine": "6.2.0",
     "pybind11-stubgen": "0.14",
-    "scikit-build-core": "0.8",
+    "scikit-build-core": "0.12",
 }
 
 # Packages whose version floor is a compatibility constraint, not a freshness

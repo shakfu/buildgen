@@ -4,9 +4,9 @@
 # This Makefile wraps common build commands for convenience.
 # The actual build is handled by scikit-build-core via pyproject.toml
 
-.PHONY: all sync build rebuild test lint format typecheck qa clean \
-        distclean wheel sdist dist check publish-test publish upgrade \
-        coverage coverage-html docs release help
+.PHONY: all sync build rebuild test lint lint-check format format-check \
+        typecheck qa clean distclean wheel sdist dist check publish-test \
+        publish upgrade coverage coverage-html docs release help
 
 # Default target
 all: build
@@ -26,20 +26,28 @@ rebuild: build
 test:
 	@uv run pytest tests/ -v
 
-# Lint with ruff
+# Lint with ruff (applies fixes)
 lint:
 	@uv run ruff check --fix src/ tests/
+
+# Lint with ruff (check only, no fixes)
+lint-check:
+	@uv run ruff check src/ tests/
 
 # Format with ruff
 format:
 	@uv run ruff format src/ tests/
 
+# Check formatting without modifying files
+format-check:
+	@uv run ruff format --check src/ tests/
+
 # Type check with mypy
 typecheck:
-	@uv run mypy src/${name} --exclude '.venv'
+	@uv run mypy src/${name}
 
-# Run a full quality assurance check
-qa: test lint typecheck format
+# Run a full quality assurance check (non-mutating; mirrors CI)
+qa: lint-check format-check typecheck test
 
 # Build wheel
 wheel:
@@ -86,7 +94,7 @@ docs:
 release:
 	@echo "Current version: $$(grep '^version' pyproject.toml | head -1)"
 	@read -p "New version: " version; \
-	sed -i '' "s/^version = .*/version = \"$$version\"/" pyproject.toml; \
+	sed "s/^version = .*/version = \"$$version\"/" pyproject.toml > pyproject.toml.tmp && mv pyproject.toml.tmp pyproject.toml; \
 	git add pyproject.toml; \
 	git commit -m "Bump version to $$version"; \
 	git tag -a "v$$version" -m "Release $$version"; \
@@ -115,10 +123,12 @@ help:
 	@echo "  build        - Rebuild extension after code changes"
 	@echo "  rebuild      - Alias for build"
 	@echo "  test         - Run tests"
-	@echo "  lint         - Lint with ruff"
+	@echo "  lint         - Lint with ruff (applies fixes)"
+	@echo "  lint-check   - Lint with ruff (check only)"
 	@echo "  format       - Format with ruff"
+	@echo "  format-check - Check formatting without modifying files"
 	@echo "  typecheck    - Type check with mypy"
-	@echo "  qa           - Run full quality assurance (test, lint, typecheck, format)"
+	@echo "  qa           - Run full quality assurance (non-mutating: lint-check, format-check, typecheck, test)"
 	@echo "  wheel        - Build wheel distribution"
 	@echo "  sdist        - Build source distribution"
 	@echo "  dist         - Build both wheel and sdist"

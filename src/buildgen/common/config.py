@@ -29,7 +29,7 @@ CONFIG_TEMPLATE = """\
 # ruff = "0.14.0"
 # mypy = "1.18.0"
 # pytest = "8.4.0"
-# scikit-build-core = "0.8"
+# scikit-build-core = "0.12"
 """
 
 

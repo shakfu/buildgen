@@ -2,7 +2,7 @@
 
 A Python C extension module.
 
-## Quick Start
+${"##"} Quick Start
 
 ```bash
 uv sync

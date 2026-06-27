@@ -1,12 +1,19 @@
-<%page args="name, options={}" />
+<%page args="name, options={}, defaults={}" />\
 <%
 raw_options = locals().get("options")
 if not isinstance(raw_options, dict):
     raw_options = {}
 opts = raw_options
-python_version = opts.get("python_version", "3.12")
-min_python = opts.get("min_python", "3.9")
-%>
+_defaults = defaults if isinstance(defaults, dict) else {}
+# The floor matches pyproject's requires-python (defaults.python_version); CI
+# must not test below it. The newest leg is a recent release, clamped to >= floor.
+min_python = opts.get("min_python", _defaults.get("python_version", "3.10"))
+python_version = opts.get("python_version", "3.13")
+_vt = lambda v: tuple(int(p) for p in v.split("."))
+if _vt(python_version) < _vt(min_python):
+    python_version = min_python
+_matrix_versions = [min_python] if min_python == python_version else [min_python, python_version]
+%>\
 name: CI
 
 on:
@@ -28,10 +35,10 @@ jobs:
     name: QA (lint, typecheck, test)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v7
+        uses: astral-sh/setup-uv@v8
         with:
           enable-cache: true
 
@@ -48,16 +55,17 @@ jobs:
         run: uv run ruff format --check src/ tests/
 
       - name: Type check with mypy
-        run: uv run mypy src/${name}/__init__.py tests/ --exclude '.venv'
+        run: uv run mypy src/${name} tests/
 
       - name: Run tests
         run: uv run pytest tests/ -v --cov=src/${name} --cov-report=xml
 
       - name: Upload coverage
-        uses: codecov/codecov-action@v5
+        uses: codecov/codecov-action@v7
         with:
           files: coverage.xml
           fail_ci_if_error: false
+          token: ${"${{ secrets.CODECOV_TOKEN }}"}
 
   build:
     name: Build (${"${{ matrix.os }}"}/${"${{ matrix.python-version }}"})
@@ -67,13 +75,13 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
-        python-version: ["${min_python}", "${python_version}"]
+        python-version: [${", ".join('"%s"' % v for v in _matrix_versions)}]
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v7
+        uses: astral-sh/setup-uv@v8
         with:
           enable-cache: true
 
@@ -90,7 +98,7 @@ jobs:
         run: uv run pytest tests/ -v
 
       - name: Upload wheel artifact
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: wheel-${"${{ matrix.os }}"}-py${"${{ matrix.python-version }}"}
           path: dist/*.whl
@@ -102,7 +110,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Download all artifacts
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v8
         with:
           path: all-wheels
           pattern: wheel-*
@@ -112,7 +120,7 @@ jobs:
         run: ls -la all-wheels/
 
       - name: Upload combined artifacts
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: all-wheels
           path: all-wheels/

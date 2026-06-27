@@ -6,7 +6,7 @@ pybind11 extension with optional native tests and an embedded CLI example. Edit
 Catch2/GTest harnesses and CLI support, then re-run `buildgen render` to
 regenerate the project.
 
-## Quick Start
+${"##"} Quick Start
 
 ```bash
 uv sync
