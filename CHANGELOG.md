@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.2.0]
+
 ### Added
 
 - **`py/nodeps` recipe** - a pure-Python package with no runtime dependencies: hatchling backend, no `CMakeLists.txt`, no compiler in the loop. The generated project ships a standard-library-only example module, a PEP 561 `py.typed` marker, and a test asserting the installed distribution declares no runtime requirements. Verified end to end under both `uv` and `venv`: sync, test, and build produce a single `py3-none-any` wheel.
