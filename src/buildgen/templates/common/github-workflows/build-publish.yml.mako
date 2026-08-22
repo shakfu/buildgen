@@ -52,7 +52,7 @@ jobs:
       - uses: actions/checkout@v7
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v10
+        uses: astral-sh/setup-uv@v10.0.1
 
       - name: Build sdist
         run: uv build --sdist
@@ -76,7 +76,7 @@ jobs:
           platforms: arm64
 
       - name: Build wheels
-        uses: pypa/cibuildwheel@v4
+        uses: pypa/cibuildwheel@v4.2
         env:
           CIBW_ARCHS_LINUX: x86_64 aarch64
 
@@ -94,7 +94,7 @@ jobs:
       - uses: actions/checkout@v7
 
       - name: Build wheels
-        uses: pypa/cibuildwheel@v4
+        uses: pypa/cibuildwheel@v4.2
         env:
           CIBW_ARCHS_MACOS: x86_64 arm64
 
@@ -112,7 +112,7 @@ jobs:
       - uses: actions/checkout@v7
 
       - name: Build wheels
-        uses: pypa/cibuildwheel@v4
+        uses: pypa/cibuildwheel@v4.2
         env:
           CIBW_ARCHS_WINDOWS: AMD64
 

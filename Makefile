@@ -1,4 +1,4 @@
-.PHONY: all test coverage coverage-html lint format format-check typecheck \
+.PHONY: all test coverage coverage-html lint lint-check format format-check typecheck \
 		build check publish publish-test clean qa \
 		update-actions update-actions-write
 
@@ -18,8 +18,12 @@ coverage-html:
 
 # Linting and formatting
 lint:
-	@echo "running ruff check"
+	@echo "running ruff check (autofixing)"
 	@uv run ruff check --fix src tests
+
+lint-check:
+	@echo "running ruff check"
+	@uv run ruff check src tests
 
 format:
 	@echo "formatting code with ruff"
@@ -33,7 +37,7 @@ typecheck:
 	@echo "running type checkers"
 	@uv run mypy src
 
-qa: test lint typecheck format 
+qa: lint-check format-check typecheck test
 	@echo "running all checkers"
 
 # Build and publish

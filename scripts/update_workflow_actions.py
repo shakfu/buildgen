@@ -6,9 +6,15 @@ workflow templates (``src/buildgen/templates/**/github-workflows``) for
 ``uses: owner/repo@ref`` lines, looks up each action's latest release via the
 GitHub API, and rewrites the ref.
 
-Convention: refs are normalized to a major-version tag (``@v8``) so every
-reference to a given action stays consistent and tracks the latest major. Use
-``--style full`` for exact tags (``@v8.2.0``) instead.
+Convention: refs are normalized to the shortest *floating* tag an action
+actually publishes, so a reference tracks upstream patch releases without
+needing another sweep here. For a latest release of ``v8.2.0`` the candidates
+are tried in order ``v8``, ``v8.2``, ``v8.2.0`` and the first one that exists
+upstream wins. Not every action publishes moving major tags -- ``pypa/cibuildwheel``
+stops at ``v4.2`` and ``astral-sh/setup-uv`` dropped them entirely after v7 --
+and writing a ref that does not exist breaks every workflow that uses it, at
+action-resolution time, before any job runs. Use ``--style full`` to pin exact
+release tags (``v8.2.0``) unconditionally.
 
 Examples::
 
@@ -49,6 +55,7 @@ SHA_RE = re.compile(r"^[0-9a-f]{40}$")
 
 def should_update(ref: str) -> bool:
     return bool(VERSION_TAG_RE.match(ref) or SHA_RE.match(ref))
+
 
 # Directories scanned, relative to the repo root. Both literal workflows and
 # the .mako templates that generate downstream workflows.
@@ -121,31 +128,106 @@ def fetch_latest_tag_http(action: str) -> str | None:
         return None
 
 
-def make_resolver(use_gh: bool):
-    """Return a cached latest-tag resolver."""
-    cache: dict[str, str | None] = {}
-    fetch = fetch_latest_tag_gh if use_gh else fetch_latest_tag_http
+def tag_exists_gh(action: str, tag: str) -> bool:
+    try:
+        subprocess.run(
+            ["gh", "api", f"repos/{action}/git/ref/tags/{tag}"],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        return True
+    except subprocess.CalledProcessError:
+        return False
 
-    def resolve(action: str) -> str | None:
-        if action not in cache:
-            cache[action] = fetch(action)
-        return cache[action]
 
-    return resolve
+def tag_exists_http(action: str, tag: str) -> bool:
+    url = f"https://api.github.com/repos/{action}/git/ref/tags/{tag}"
+    req = urllib.request.Request(url, headers={"Accept": "application/vnd.github+json"})
+    token = os.environ.get("GITHUB_TOKEN") or os.environ.get("GH_TOKEN")
+    if token:
+        req.add_header("Authorization", f"Bearer {token}")
+    try:
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            return 200 <= resp.status < 300
+    except urllib.error.HTTPError:
+        return False
+    except urllib.error.URLError as exc:
+        print(f"  warning: HTTP lookup for {action}@{tag} failed: {exc}", file=sys.stderr)
+        return False
 
 
-def desired_ref(tag: str, style: str) -> str | None:
-    """Map a release tag (e.g. ``v8.2.0``) to the desired ref for ``style``."""
+def ref_candidates(tag: str, style: str) -> list[str]:
+    """Refs to try for a release ``tag``, shortest (most floating) first.
+
+    ``v8.2.0`` yields ``["v8", "v8.2", "v8.2.0"]`` under the default style, and
+    just ``["v8.2.0"]`` under ``full``. A tag with a pre-release suffix or any
+    other non-numeric shape only ever yields itself.
+    """
     if style == "full":
-        return tag
-    # style == "major": take the leading vN component.
-    m = re.match(r"v?(\d+)", tag)
-    if not m:
-        return None
-    return f"v{m.group(1)}"
+        return [tag]
+    m = re.fullmatch(r"v?(\d+)(?:\.(\d+))?(?:\.(\d+))?", tag)
+    if m is None:
+        return [tag]
+    parts = [p for p in m.groups() if p is not None]
+    candidates = ["v" + ".".join(parts[: i + 1]) for i in range(len(parts))]
+    # The release tag itself is authoritative; keep it as the final fallback
+    # even when its spelling differs from the reconstructed one (e.g. "8.2.0").
+    if tag not in candidates:
+        candidates.append(tag)
+    return candidates
 
 
-def plan_changes(files: list[Path], resolve, style: str) -> list[Change]:
+class Resolver:
+    """Caches latest-release lookups and tag-existence checks per action."""
+
+    def __init__(self, use_gh: bool) -> None:
+        self._fetch = fetch_latest_tag_gh if use_gh else fetch_latest_tag_http
+        self._exists = tag_exists_gh if use_gh else tag_exists_http
+        self._latest_cache: dict[str, str | None] = {}
+        self._exists_cache: dict[tuple[str, str], bool] = {}
+        self._desired_cache: dict[tuple[str, str], str | None] = {}
+
+    def latest_tag(self, action: str) -> str | None:
+        if action not in self._latest_cache:
+            self._latest_cache[action] = self._fetch(action)
+        return self._latest_cache[action]
+
+    def tag_exists(self, action: str, tag: str) -> bool:
+        key = (action, tag)
+        if key not in self._exists_cache:
+            self._exists_cache[key] = self._exists(action, tag)
+        return self._exists_cache[key]
+
+    def desired_ref(self, action: str, style: str) -> str | None:
+        """Shortest published ref for ``action``, or None if unresolvable.
+
+        Never returns a ref that does not exist upstream: a workflow pinned to a
+        missing tag fails to resolve and takes every job in the file with it.
+        """
+        key = (action, style)
+        if key in self._desired_cache:
+            return self._desired_cache[key]
+
+        tag = self.latest_tag(action)
+        result: str | None = None
+        if tag is not None:
+            candidates = ref_candidates(tag, style)
+            result = next(
+                (c for c in candidates if self.tag_exists(action, c)),
+                None,
+            )
+            if result is None:
+                print(
+                    f"warning: none of {', '.join(candidates)} exist for {action}; "
+                    "leaving its pin alone",
+                    file=sys.stderr,
+                )
+        self._desired_cache[key] = result
+        return result
+
+
+def plan_changes(files: list[Path], resolver: Resolver, style: str) -> list[Change]:
     changes: list[Change] = []
     for path in files:
         text = path.read_text(encoding="utf-8")
@@ -153,18 +235,15 @@ def plan_changes(files: list[Path], resolve, style: str) -> list[Change]:
             action, ref = m.group("action"), m.group("ref")
             if not should_update(ref):
                 continue  # leave branch/floating refs (release/v1, main) alone
-            tag = resolve(action)
-            if tag is None:
-                changes.append(Change(path, action, ref, ref))  # unresolved -> no-op
-                continue
-            new_ref = desired_ref(tag, style)
+            new_ref = resolver.desired_ref(action, style)
             if new_ref is None:
+                changes.append(Change(path, action, ref, ref))  # unresolved -> no-op
                 continue
             changes.append(Change(path, action, ref, new_ref))
     return changes
 
 
-def apply_changes(files: list[Path], resolve, style: str) -> int:
+def apply_changes(files: list[Path], resolver: Resolver, style: str) -> int:
     applied = 0
     for path in files:
         text = path.read_text(encoding="utf-8")
@@ -174,10 +253,7 @@ def apply_changes(files: list[Path], resolve, style: str) -> int:
             action, ref = m.group("action"), m.group("ref")
             if not should_update(ref):
                 return m.group(0)
-            tag = resolve(action)
-            if tag is None:
-                return m.group(0)
-            new_ref = desired_ref(tag, style)
+            new_ref = resolver.desired_ref(action, style)
             if new_ref is None or new_ref == ref:
                 return m.group(0)
             applied += 1
@@ -200,7 +276,7 @@ def main(argv: list[str] | None = None) -> int:
         "--style",
         choices=("major", "full"),
         default="major",
-        help="pin to major tag (vN, default) or full release tag (vN.N.N)",
+        help="pin to the shortest published tag (default) or the full release tag",
     )
     args = parser.parse_args(argv)
 
@@ -213,14 +289,16 @@ def main(argv: list[str] | None = None) -> int:
     use_gh = shutil.which("gh") is not None
     if not use_gh:
         print("gh CLI not found; falling back to api.github.com.", file=sys.stderr)
-    resolve = make_resolver(use_gh)
+    resolver = Resolver(use_gh)
 
-    changes = plan_changes(files, resolve, args.style)
+    changes = plan_changes(files, resolver, args.style)
 
-    unresolved = sorted({c.action for c in changes if resolve(c.action) is None})
+    unresolved = sorted(
+        {c.action for c in changes if resolver.desired_ref(c.action, args.style) is None}
+    )
     if unresolved:
         for action in unresolved:
-            print(f"warning: could not resolve latest release for {action}", file=sys.stderr)
+            print(f"warning: could not resolve a usable ref for {action}", file=sys.stderr)
 
     updates = [c for c in changes if c.changed]
     if not updates:
@@ -244,7 +322,7 @@ def main(argv: list[str] | None = None) -> int:
         print("\nRe-run with --write to apply.")
         return 0
 
-    applied = apply_changes(files, resolve, args.style)
+    applied = apply_changes(files, resolver, args.style)
     print(f"\nApplied {applied} update(s).")
     return 0
 
