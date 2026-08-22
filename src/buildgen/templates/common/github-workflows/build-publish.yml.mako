@@ -52,7 +52,7 @@ jobs:
       - uses: actions/checkout@v7
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v8
+        uses: astral-sh/setup-uv@v10
 
       - name: Build sdist
         run: uv build --sdist

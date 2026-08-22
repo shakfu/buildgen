@@ -2,6 +2,87 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+### Added
+
+- **`py/nodeps` recipe** - a pure-Python package with no runtime dependencies: hatchling backend, no `CMakeLists.txt`, no compiler in the loop. The generated project ships a standard-library-only example module, a PEP 561 `py.typed` marker, and a test asserting the installed distribution declares no runtime requirements. Verified end to end under both `uv` and `venv`: sync, test, and build produce a single `py3-none-any` wheel.
+  - New `common/github-workflows/publish.yml.mako` - a plain sdist/wheel publish workflow (`uv build` plus trusted publishing to TestPyPI then PyPI). The cibuildwheel matrix only makes sense for compiled extensions.
+  - `ci.yml.mako`, both `Makefile` templates, and `CHANGELOG.md.mako` accept a `pure_python` option: the CI build leg collapses to a single runner, `build` no longer forces an extension reinstall, `distclean` no longer looks for a CMake cache, and the venv install drops `--no-build-isolation` so the backend is fetched rather than assumed present.
+  - `hatchling` joins the PyPI-resolved dependency floors in `common/deps.py`.
+
+- **`Recipe.template_type`** - a recipe now names its own template-registry key via `template_key`, so it no longer has to be a `skbuild-{framework}` type to be rendered. `Recipe.build_system` gains a third value, `"python"`, for recipes with no native build.
+
+- **CI for this repository** (`.github/workflows/ci.yml`) - previously the only workflow was a tag-triggered publish, so the QA gate ran only at release time. Pushes and pull requests now run `ruff`, `mypy`, and the full suite on Python 3.11 and 3.14, plus a `make build` + `twine check` leg. A macOS/Windows leg runs `pytest --skip-skbuild-build` to exercise the generators on the platforms generated projects claim to support; it is marked `continue-on-error` until the portability gaps it finds are addressed.
+
+- **Tests for the two areas that had none.**
+  - `tests/test_cli_commands.py` covers the config-driven path: the `generate --config` -> `generate --from` round trip, C and mixed-language Makefile output, library-name normalization, `cli/main.py` subcommand dispatch, and the `--test`/`--build` flag guard. It compiles and runs a generated C project end to end, and runs one check under `python -O` to prove validation is not compiled away.
+  - `tests/test_registry_consistency.py` guards the three hand-synced registries (`RECIPES`, `CMakeProjectGenerator.TEMPLATE_FILES`, and the skbuild `TEMPLATE_FILES`): they must agree in both directions, the two legacy-name maps must agree with each other, every template set must be claimed by exactly one recipe, and every referenced built-in template file must exist on disk for both the `uv` and `venv` variants.
+
+  Suite size goes from 382 to 512 tests; coverage from 67% to 72%, with `cli/main.py` at 58% (was 7%), `cli/commands.py` at 51% (was 41%), and `common/project.py` at 94%.
+
+### Changed
+
+- **buildgen's own build backend is now hatchling** instead of `uv_build`. The `uv_build>=0.11.25,<0.12` pin excluded the installed uv (0.12.3) and warned on every build; uv-build is version-locked to uv by design, so the cap would keep breaking. The resulting wheel contains exactly the same 134 files. The dev-group `twine` floor moves to `>=7.0.0`, which understands the Metadata-Version 2.5 that hatchling emits for PEP 639 license metadata; the generated-project floor moves with it, since `py/nodeps` uses hatchling too.
+
+- **PyPI version resolution runs concurrently** with a 2s per-request timeout, replacing 8 sequential 5s requests. The warm path measures at roughly one round trip; the offline worst case drops from about 40s to about 2s. The bundled-defaults fallback is unchanged.
+
+- **`generate --config` emits the schema the loader actually reads.** The template now carries `compile_options`, `compile_definitions`, `link_options`, `include_dirs`, `link_dirs`, `dependencies`, `languages`, `cc`/`cxx`, and per-target `include_dirs`/`link_libraries`. Previously it emitted `cflags`, `cxxflags`, `ldflags`, and `ldlibs` - none of which `ProjectConfig.from_dict` reads - so a user who wrote flags into the generated template got a config that loaded and round-tripped with those flags silently gone.
+
+- **`project.flex.json` is trimmed to the fields that influence the render.** The `targets`, `dependencies`, and `compile_options` blocks described a build the render never produced and are gone. `cmake_options` stays, relabelled as a record of the flags the render bakes in rather than an input.
+
+- **`is_cmake_recipe` answers from the recipe registry**, not from `CMakeProjectGenerator`'s template map, and `buildgen new` / `buildgen test` dispatch on `Recipe.build_system`. A recipe registered without its templates now fails with the generator's own error naming what is missing, rather than a vague "No generator available".
+
+- **`buildgen list`** labels the `py` category "Python Recipes" rather than "Python Extension Recipes", since it now holds a non-extension recipe.
+
+- **GitHub Actions pins** updated across this repo's workflows and the generated-project templates: `astral-sh/setup-uv` to `@v10`. The rest (`actions/checkout@v7`, `actions/upload-artifact@v7`, `actions/download-artifact@v8`, `codecov/codecov-action@v7`, `docker/setup-qemu-action@v4`, `pypa/cibuildwheel@v4`) were already current.
+
+### Fixed
+
+#### Config-driven Makefile generation
+
+- **The generator is no longer C-unaware.** It emitted only `CXX`, only a `%.o: %.cpp` pattern rule, and no `-std=c<N>`, so C sources built through make's implicit rules and linked with `g++` regardless of `cc` and `c_standard`. It now emits `CC` when C is in play, one pattern rule per source extension actually used, `-std=c<N>` into `CFLAGS`, global compile options and definitions into both flag sets, and links a C-only target with `$(CC)` while anything containing C++ links with `$(CXX)`.
+
+- **Project-level `dependencies` reach the link line at all.** `LDLIBS` was emitted as a variable that no generated recipe referenced, so every declared system library was silently dropped from every link command. Shared-library recipes also ignored their target's `link_libraries` entirely.
+
+- **Library names are normalized before reaching the link line.** A dependency named `fmt::fmt` produced the nonsensical `-lfmt::fmt`. CMake-style namespaced names are reduced to their final component, and a value that is already a flag (`-ldl`) passes through untouched.
+
+- **Shared libraries compile position-independent code.** Declaring any `shared` target adds `-fPIC`, which the single global object pattern rule requires.
+
+#### Low-level Makefile API
+
+- **Declared target order is preserved.** `_write_targets` sorted alphabetically, so declaration order - and with it make's default goal - was decided by the alphabet: `all` came first only because it happened to sort first. Targets are now written in the order they were added, and the config-driven generator declares `all` before the targets it aggregates.
+
+- **Input validation no longer depends on how Python was started.** `check_dir` and `_add_entry_or_variable` used bare `assert`, which `python -O` strips, so an invalid include or link directory was accepted silently under optimization. They raise `ValueError` now, with a message naming the list that rejected the entry.
+
+- **Directory validation no longer depends on call order.** A `$(VAR)` reference to a variable the generator did not yet know about raised. Such a variable may come from an include, the environment, or a later `add_variable` call, so unknown references are accepted and left for make to resolve; a reference to a *known* variable whose value is not a directory is still rejected.
+
+#### Generated projects
+
+- **Line continuations survive template rendering.** Mako consumes a trailing backslash together with its newline, so every generated Makefile had its `.PHONY` declaration and its multi-line `release` recipe collapsed onto one line - the latter worked only because `;` happened to separate the commands. Continuations are now emitted explicitly.
+
+- **`make docs` no longer fails out of the box.** The uv target runs `uv run --with sphinx sphinx-build`, since Sphinx is not in the generated `dev` dependency group; the venv target documents that Sphinx must be installed first.
+
+- **`coverage-html` help line** was missing a space before its dash.
+
+#### CLI
+
+- **`project.json` from a flex render agrees with what was rendered.** `-DBUILD_CPP_TESTS=ON` was hardcoded even when `test_framework: none` turned the harness off, and booleans were written with Python's capitalized spelling (`-DBUILD_EMBEDDED_CLI=False`). Derived options are resolved alongside user options now, and a boolean in a `-D` position renders as `ON`/`OFF`.
+
+- **`buildgen test --test` without `--build` reports an error** instead of running nothing. The help text already said it required `--build`, but the build guard silently swallowed it.
+
+- **`buildgen templates show` accepts any recipe path**, not just the five legacy `skbuild-*` names and their aliases.
+
+### Documentation
+
+- **The flex recipe's workflow is described accurately.** The README claimed that editing the `options` block and re-running `cmake` explores different combinations. It does not: the options are baked into `pyproject.toml`'s `[tool.scikit-build.cmake.define]` table and the `option()` defaults at render time, and scikit-build-core re-applies its own defines on every build. Changing options means running `buildgen render` again.
+
+- **A template-override limitation is now stated rather than silently surprising.** Override resolution covers the files in a recipe's file map, not templates pulled in by a Mako `<%include>`. Every `py/*` recipe includes `common/pyproject.base.toml.mako`, which Mako resolves relative to the including template's own directory and the built-in `py/` root only - so an override dropped at `~/.buildgen/templates/py/common/pyproject.base.toml.mako` has no effect and produces no warning. The README documents this along with the two placements that do work.
+
+- **The Makefile back end's language rules are documented**: how `languages`, source extensions, and the standard settings decide pattern rules and link drivers; that a `shared` target makes every compile position-independent; how library names are normalized; and that include and link directories must exist before `generate --from` runs.
+
+- **The low-level generator contract is documented**: targets are written in the order added, so the first one added becomes make's default goal.
+
 ## [0.1.12]
 
 ### Added

@@ -34,6 +34,12 @@ LEGACY_TO_RECIPE_PATH = {
     "skbuild-nanobind": "py/nanobind",
 }
 
+# Pure-Python recipes: rendered by the same machinery, but with no native
+# build step -- keyed by recipe path rather than a legacy "skbuild-*" name.
+PY_PLAIN_TYPES = {
+    "py/nodeps": "Pure-Python package with no runtime dependencies",
+}
+
 # Mapping of template type to output file structure
 # Keys are output paths (with ${name} placeholder), values are template file paths
 # Template paths are relative to the recipe directory (e.g., py/pybind11/)
@@ -102,6 +108,20 @@ TEMPLATE_FILES = {
         "src/${name}/py.typed": "src/py.typed.mako",
         "tests/test_${name}.py": "tests/test.py.mako",
     },
+    "py/nodeps": {
+        ".gitignore": "common/gitignore.python.mako",
+        ".github/workflows/ci.yml": "common/github-workflows/ci.yml.mako",
+        ".github/workflows/publish.yml": "common/github-workflows/publish.yml.mako",
+        "CHANGELOG.md": "common/CHANGELOG.md.mako",
+        "LICENSE": "common/LICENSE.mako",
+        "Makefile": "common/Makefile.{env}.mako",
+        "pyproject.toml": "pyproject.toml.mako",
+        "README.md": "README.md.mako",
+        "src/${name}/__init__.py": "src/__init__.py.mako",
+        "src/${name}/core.py": "src/core.py.mako",
+        "src/${name}/py.typed": "src/py.typed.mako",
+        "tests/test_${name}.py": "tests/test.py.mako",
+    },
     "skbuild-nanobind": {
         ".gitignore": "common/gitignore.python.mako",
         ".github/workflows/ci.yml": "common/github-workflows/ci.yml.mako",
@@ -118,6 +138,26 @@ TEMPLATE_FILES = {
         "tests/test_${name}.py": "tests/test.py.mako",
     },
 }
+
+
+def get_type_description(template_type: str) -> str:
+    """Human-readable description for a template registry key."""
+    if template_type in SKBUILD_TYPES:
+        return SKBUILD_TYPES[template_type]
+    return PY_PLAIN_TYPES.get(template_type, "Unknown template type")
+
+
+def get_registry_key(template_type: str) -> Optional[str]:
+    """Map a legacy type name or a recipe path to its TEMPLATE_FILES key.
+
+    Returns None when *template_type* names no known template set.
+    """
+    if template_type in TEMPLATE_FILES:
+        return template_type
+    for legacy, recipe_path in LEGACY_TO_RECIPE_PATH.items():
+        if recipe_path == template_type:
+            return legacy
+    return None
 
 
 def get_recipe_path(template_type: str) -> str:

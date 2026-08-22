@@ -52,7 +52,7 @@ dev = [
     "pytest>=${_dv.get('pytest', '8.4.2')}",
     "pytest-cov>=${_dv.get('pytest-cov', '7.0.0')}",
     "ruff>=${_dv.get('ruff', '0.14.9')}",
-    "twine>=${_dv.get('twine', '6.2.0')}",
+    "twine>=${_dv.get('twine', '7.0.0')}",
 ]
 
 [build-system]

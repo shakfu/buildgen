@@ -21,6 +21,10 @@ COMPILABLE_RECIPES = sorted(
 SKBUILD_RECIPES = sorted(
     name for name, recipe in RECIPES.items() if recipe.build_system == "skbuild"
 )
+# Pure-Python recipes: rendered by the same generator, but with no native build.
+PY_PLAIN_RECIPES = sorted(
+    name for name, recipe in RECIPES.items() if recipe.build_system == "python"
+)
 SKBUILD_TEST_CONTEXT_OVERRIDES: dict[str, dict] = {
     "py/pybind11-flex": {"options": {"test_framework": "none", "build_examples": False}}
 }
@@ -44,8 +48,8 @@ def _generate_project(
 
     if recipe.build_system == "cmake":
         generator = CMakeProjectGenerator(project_name, recipe_name, output_dir)
-    elif recipe.build_system == "skbuild":
-        skbuild_type = f"skbuild-{recipe.framework}"
+    elif recipe.build_system in ("skbuild", "python"):
+        skbuild_type = recipe.template_type
         env_tool = recipe.default_options.get("env", "uv")
         context = {}
         if recipe.default_options:
@@ -138,9 +142,12 @@ def test_recipe_generates(build_project_dir_factory, recipe_name):
     if recipe.build_system == "cmake":
         assert (project_dir / "CMakeLists.txt").exists()
         assert (project_dir / "Makefile").exists()
-    else:
+    elif recipe.build_system == "skbuild":
         assert (project_dir / "pyproject.toml").exists()
         assert (project_dir / "CMakeLists.txt").exists()
+    else:
+        assert (project_dir / "pyproject.toml").exists()
+        assert not (project_dir / "CMakeLists.txt").exists()
 
 
 @pytest.mark.parametrize("recipe_name", COMPILABLE_RECIPES)
@@ -160,3 +167,45 @@ def test_skbuild_recipes_build(
 
     _, project_dir = _generate_project(recipe_name, build_project_dir_factory)
     _build_skbuild_project(project_dir)
+
+
+@pytest.mark.parametrize("recipe_name", PY_PLAIN_RECIPES)
+def test_py_plain_recipes_are_pure_python(build_project_dir_factory, recipe_name):
+    """Pure-Python recipes declare no runtime deps and no native build."""
+    _, project_dir = _generate_project(recipe_name, build_project_dir_factory)
+
+    pyproject = (project_dir / "pyproject.toml").read_text()
+    assert "dependencies = []" in pyproject
+    assert 'build-backend = "hatchling.build"' in pyproject
+    assert "scikit-build" not in pyproject
+    assert not (project_dir / "CMakeLists.txt").exists()
+
+    # The pure-Python CI leg builds one wheel on one runner.
+    ci = (project_dir / ".github/workflows/ci.yml").read_text()
+    assert "os: [ubuntu-latest]" in ci
+    assert "cibuildwheel" not in ci
+    assert (project_dir / ".github/workflows/publish.yml").exists()
+    assert not (project_dir / ".github/workflows/build-publish.yml").exists()
+
+    # Makefile must not reference the native toolchain.
+    makefile = (project_dir / "Makefile").read_text()
+    assert "CMakeCache.txt" not in makefile
+    assert "reinstall-package" not in makefile
+
+
+@pytest.mark.parametrize("recipe_name", PY_PLAIN_RECIPES)
+def test_py_plain_recipes_build(
+    build_project_dir_factory, recipe_name, build_skbuild_enabled
+):
+    """Pure-Python recipes should sync, test, and build a py3-none-any wheel."""
+    if not build_skbuild_enabled:
+        pytest.skip("Disabled via --skip-skbuild-build")
+
+    _, project_dir = _generate_project(recipe_name, build_project_dir_factory)
+    _run_command(["uv", "sync"], cwd=project_dir, label="uv sync")
+    _run_command(["uv", "run", "pytest", "-q"], cwd=project_dir, label="pytest")
+    _run_command(["uv", "build"], cwd=project_dir, label="uv build")
+
+    wheels = list((project_dir / "dist").glob("*.whl"))
+    assert len(wheels) == 1, f"expected one wheel, got {wheels}"
+    assert wheels[0].name.endswith("-py3-none-any.whl"), wheels[0].name

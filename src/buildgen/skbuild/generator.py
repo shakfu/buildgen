@@ -1,4 +1,9 @@
-"""scikit-build-core project generator."""
+"""Python project generator.
+
+Renders the template file map for a ``py/*`` recipe. Most recipes build a
+native extension through scikit-build-core; pure-Python recipes (``py/nodeps``)
+reuse the same machinery with a file map that has no CMakeLists.txt.
+"""
 
 from pathlib import Path
 from typing import Optional, Any, Dict
@@ -10,6 +15,7 @@ from buildgen.common.deps import get_default_versions, resolve_latest_versions
 from buildgen.skbuild.templates import (
     SKBUILD_TYPES,
     TEMPLATE_FILES,
+    get_type_description,
     resolve_template_files,
 )
 from buildgen.templates.resolver import BUILTIN_TEMPLATES_DIR
@@ -34,6 +40,7 @@ class SkbuildProjectGenerator:
     - skbuild-cython: Cython extension
     - skbuild-c: Pure C extension
     - skbuild-nanobind: Modern C++ bindings with nanobind
+    - py/nodeps: Pure-Python package, no native build
 
     Template Override Support:
     Templates are resolved in this order (first match wins):
@@ -182,7 +189,7 @@ class SkbuildProjectGenerator:
 
     def get_description(self) -> str:
         """Get description for this template type."""
-        return SKBUILD_TYPES.get(self.template_type, "Unknown template type")
+        return get_type_description(self.template_type)
 
     def get_template_sources(self) -> dict[str, str]:
         """Get the source location for each template file.

@@ -20,6 +20,7 @@ from buildgen.recipes import (
     get_recipe,
     get_recipes_by_category,
     is_valid_recipe,
+    resolve_derived_options,
 )
 from buildgen.templates.resolver import (
     TemplateResolver,
@@ -27,10 +28,22 @@ from buildgen.templates.resolver import (
 )
 
 
+def _recipe_context(recipe: "Recipe") -> Optional[dict[str, Any]]:
+    """Template context implied by a recipe itself.
+
+    Only pure-Python recipes seed ``options`` from their defaults: for skbuild
+    recipes the options block is user-supplied (via a configurable recipe's
+    config file), so seeding it here would silently override that flow.
+    """
+    if recipe.build_system == "python" and recipe.default_options:
+        return {"options": dict(recipe.default_options)}
+    return None
+
+
 def cmd_new(args: argparse.Namespace) -> None:
     """Create a new project from a recipe."""
     from buildgen.skbuild.generator import SkbuildProjectGenerator
-    from buildgen.cmake.project_generator import CMakeProjectGenerator, is_cmake_recipe
+    from buildgen.cmake.project_generator import CMakeProjectGenerator
     from buildgen.common.config import load_user_config
 
     name = args.name
@@ -62,14 +75,14 @@ def cmd_new(args: argparse.Namespace) -> None:
 
     update_deps = not getattr(args, "no_update_deps", False)
 
-    # Handle scikit-build-core templates (py/* recipes)
-    if recipe.build_system == "skbuild":
-        skbuild_type = f"skbuild-{recipe.framework}"
+    # Handle Python recipes (py/*): scikit-build-core extensions and pure-Python
+    if recipe.build_system in ("skbuild", "python"):
         gen = SkbuildProjectGenerator(
             name,
-            skbuild_type,
+            recipe.template_type,
             output_dir,
             env_tool=env_tool,
+            context=_recipe_context(recipe),
             user_config=user_config,
             update_deps=update_deps,
         )
@@ -81,8 +94,11 @@ def cmd_new(args: argparse.Namespace) -> None:
             print(f"  {rel_path}")
         return
 
-    # Handle CMake-based templates (cpp/* and c/* recipes)
-    if is_cmake_recipe(recipe_name):
+    # Handle CMake-based templates (cpp/* and c/* recipes). Dispatch is keyed
+    # off the recipe registry, so a recipe registered without a matching
+    # template set fails with the generator's own error naming what is missing,
+    # rather than a vague "no generator available".
+    if recipe.build_system == "cmake":
         cmake_gen = CMakeProjectGenerator(
             name, recipe_name, output_dir, user_config=user_config
         )
@@ -148,7 +164,7 @@ def cmd_list(args: argparse.Namespace) -> None:
     category_names = {
         "cpp": "C++ Recipes",
         "c": "C Recipes",
-        "py": "Python Extension Recipes",
+        "py": "Python Recipes",
     }
 
     # Filter by category if specified
@@ -172,11 +188,20 @@ def cmd_test(args: argparse.Namespace) -> None:
     import tempfile
 
     from buildgen.skbuild.generator import SkbuildProjectGenerator
-    from buildgen.cmake.project_generator import CMakeProjectGenerator, is_cmake_recipe
+    from buildgen.cmake.project_generator import CMakeProjectGenerator
 
     # Handle --all flag (shortcut for --build --test)
     do_build = args.build or getattr(args, "all", False)
     do_test = args.test or getattr(args, "all", False)
+
+    # Tests run against a built project, so --test alone has nothing to run.
+    # Reporting that beats silently doing nothing.
+    if do_test and not do_build:
+        print(
+            "Error: --test requires --build (or use --all for both)",
+            file=sys.stderr,
+        )
+        sys.exit(1)
 
     # Determine which recipes to test
     recipes_to_test = []
@@ -222,23 +247,25 @@ def cmd_test(args: argparse.Namespace) -> None:
             if project_dir.exists():
                 shutil.rmtree(project_dir)
 
-            if recipe.build_system == "skbuild":
-                skbuild_type = f"skbuild-{recipe.framework}"
+            if recipe.build_system in ("skbuild", "python"):
                 gen = SkbuildProjectGenerator(
                     project_name,
-                    skbuild_type,
+                    recipe.template_type,
                     project_dir,
                     env_tool="uv",
+                    context=_recipe_context(recipe),
                     update_deps=False,
                 )
                 gen.generate()
-            elif is_cmake_recipe(recipe_name):
+            elif recipe.build_system == "cmake":
                 cmake_gen = CMakeProjectGenerator(
                     project_name, recipe_name, project_dir
                 )
                 cmake_gen.generate()
             else:
-                result["error"] = "No generator available"
+                result["error"] = (
+                    f"No generator for build system '{recipe.build_system}'"
+                )
                 results[recipe_name] = result
                 continue
 
@@ -353,25 +380,37 @@ def cmd_generate(args: argparse.Namespace) -> None:
     if args.config:
         config_path = Path(args.config)
 
-        # Create a basic config template
+        # Create a basic config template. Every key here must be one that
+        # ProjectConfig.from_dict actually reads -- a key it ignores would be
+        # silently dropped on the next load/save round trip.
         if config_path.suffix in (".yaml", ".yml"):
             content = """# buildgen project configuration
 name: myproject
 version: "0.1.0"
 
-# C++ standard (11, 14, 17, 20, 23)
+# Languages used by the project (C, CXX)
+languages:
+  - CXX
+
+# Language standards (C++: 11, 14, 17, 20, 23; C: 99, 11, 17, 23)
 cxx_standard: 17
+# c_standard: 11
 
-# Compiler flags
-cflags: []
-cxxflags: []
-ldflags: []
+# Compilers
+cc: gcc
+cxx: g++
 
-# Include directories
+# Flags applied to every target
+compile_options: []
+compile_definitions: []
+link_options: []
+
+# Search paths
 include_dirs: []
+link_dirs: []
 
-# Libraries to link
-ldlibs: []
+# External dependencies (system libraries, find_package names, or git sources)
+dependencies: []
 
 # Targets
 targets:
@@ -379,22 +418,30 @@ targets:
     type: executable
     sources:
       - src/main.cpp
+    include_dirs: []
+    link_libraries: []
 """
         else:
             config_data = {
                 "name": "myproject",
                 "version": "0.1.0",
+                "languages": ["CXX"],
                 "cxx_standard": 17,
-                "cflags": [],
-                "cxxflags": [],
-                "ldflags": [],
+                "cc": "gcc",
+                "cxx": "g++",
+                "compile_options": [],
+                "compile_definitions": [],
+                "link_options": [],
                 "include_dirs": [],
-                "ldlibs": [],
+                "link_dirs": [],
+                "dependencies": [],
                 "targets": [
                     {
                         "name": "myapp",
                         "type": "executable",
                         "sources": ["src/main.cpp"],
+                        "include_dirs": [],
+                        "link_libraries": [],
                     }
                 ],
             }
@@ -565,13 +612,13 @@ def _prepare_recipe_options(
     *,
     override_env: Optional[str] = None,
 ) -> dict[str, Any]:
-    """Merge recipe default options with overrides."""
+    """Merge recipe default options with overrides, then add derived values."""
     options = dict(recipe.default_options)
     if config_options:
         options.update(config_options)
     if override_env:
         options["env"] = override_env
-    return options
+    return resolve_derived_options(recipe.name, options)
 
 
 def _determine_plain_config_name(source_name: str) -> str:
@@ -581,6 +628,25 @@ def _determine_plain_config_name(source_name: str) -> str:
     return source_name
 
 
+_OPTION_TOKEN_RE = re.compile(r"<options\.([a-zA-Z0-9_]+)>")
+# A token that supplies the whole value of a CMake cache entry, e.g.
+# "-DBUILD_EMBEDDED_CLI=<options.build_examples>".
+_CMAKE_DEFINE_RE = re.compile(r"^-D[A-Za-z0-9_]+=<options\.[a-zA-Z0-9_]+>$")
+
+
+def _format_option_value(value: Any, *, cmake_boolean: bool) -> str:
+    """Render an option value for substitution into a config string.
+
+    Python's ``str(True)`` is ``"True"``, which is neither the JSON spelling nor
+    the conventional CMake one, so booleans are spelled out explicitly.
+    """
+    if isinstance(value, bool):
+        if cmake_boolean:
+            return "ON" if value else "OFF"
+        return "true" if value else "false"
+    return str(value)
+
+
 def _resolve_option_tokens(value: Any, options: dict[str, Any]) -> Any:
     """Replace <options.foo> placeholders with actual option values."""
     if isinstance(value, dict):
@@ -588,15 +654,15 @@ def _resolve_option_tokens(value: Any, options: dict[str, Any]) -> Any:
     if isinstance(value, list):
         return [_resolve_option_tokens(v, options) for v in value]
     if isinstance(value, str):
-        pattern = re.compile(r"<options\.([a-zA-Z0-9_]+)>")
+        cmake_boolean = bool(_CMAKE_DEFINE_RE.match(value))
 
         def repl(match: re.Match[str]) -> str:
             key = match.group(1)
             if key in options:
-                return str(options[key])
+                return _format_option_value(options[key], cmake_boolean=cmake_boolean)
             return match.group(0)
 
-        return pattern.sub(repl, value)
+        return _OPTION_TOKEN_RE.sub(repl, value)
     return value
 
 
@@ -653,7 +719,7 @@ def cmd_templates_list(args: argparse.Namespace) -> None:
         by_category[category].append(recipe)
 
     category_names = {
-        "py": "Python Extension Templates",
+        "py": "Python Templates",
         "cpp": "C++ Templates",
         "c": "C Templates",
     }
@@ -702,34 +768,23 @@ def cmd_templates_show(args: argparse.Namespace) -> None:
     """Show template resolution details."""
     from buildgen.skbuild.templates import (
         resolve_template_files,
-        SKBUILD_TYPES,
         get_recipe_path,
-        LEGACY_TO_RECIPE_PATH,
+        get_registry_key,
     )
 
     template_type = args.recipe
     recipe_path = get_recipe_path(template_type)
 
-    # Check if it's a valid skbuild type (either legacy or recipe path)
-    if (
-        template_type not in SKBUILD_TYPES
-        and template_type not in LEGACY_TO_RECIPE_PATH.values()
-    ):
+    # Accepts a legacy type name ("skbuild-pybind11") or a recipe path
+    # ("py/pybind11", "py/nodeps").
+    registry_key = get_registry_key(template_type)
+    if registry_key is None:
         print(f"Unknown template: {template_type}", file=sys.stderr)
         print("\nUse 'buildgen templates list' to see available templates.")
         sys.exit(1)
 
-    # For show, we need the legacy type name to look up TEMPLATE_FILES
-    # Find the legacy name from recipe path
-    legacy_type = template_type
-    if template_type in LEGACY_TO_RECIPE_PATH.values():
-        for legacy, recipe in LEGACY_TO_RECIPE_PATH.items():
-            if recipe == template_type:
-                legacy_type = legacy
-                break
-
     env_tool = args.env
-    resolved = resolve_template_files(legacy_type, env_tool, Path.cwd())
+    resolved = resolve_template_files(registry_key, env_tool, Path.cwd())
 
     print(f"Template: {recipe_path}")
     print(f"Environment tool: {env_tool}")

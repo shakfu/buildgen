@@ -25,6 +25,7 @@ class TestDefaultVersions:
             "twine",
             "pybind11-stubgen",
             "scikit-build-core",
+            "hatchling",
         }
         assert expected == set(DEFAULT_VERSIONS.keys())
 

@@ -104,6 +104,29 @@ config = ProjectConfig(
 config.generate_all()
 ```
 
+The two generators are driven by the same fields, but the Makefile back end is
+the one that has to make language decisions explicitly:
+
+- `languages`, the source file extensions, and `c_standard` / `cxx_standard`
+  decide which pattern rules and `-std=` flags are emitted. A target whose
+  sources are all `.c` links with `$(CC)`; anything containing C++ links with
+  `$(CXX)`.
+- Declaring any `shared` target adds `-fPIC` to every compile, because objects
+  are built by a single global pattern rule.
+- Library names are normalized on the way to the link line: a CMake-style
+  `fmt::fmt` becomes `-lfmt`, and a value that is already a flag (`-ldl`) is
+  passed through untouched.
+- `include_dirs` and `link_dirs` are validated against the filesystem, so the
+  directories must exist before `generate --from` runs.
+
+Two behaviors worth knowing when driving `MakefileGenerator` directly:
+
+- Targets are written in the order they are added, so the first target you add
+  becomes make's default goal. Add your `all` aggregate first.
+- Include and link directories are validated when added. A path that does not
+  exist raises `ValueError`; a `$(VAR)` reference is resolved when the variable
+  is already known and otherwise accepted and left for make.
+
 ### CMake with Makefile Frontend
 
 Generate CMake as the build system with a Makefile that wraps cmake commands:
@@ -255,6 +278,12 @@ buildgen list
 | `py/cython` | Extension using Cython |
 | `py/cext` | C extension (Python.h) |
 
+**Pure Python Recipes** (hatchling, no native build):
+
+| Recipe | Description |
+|--------|-------------|
+| `py/nodeps` | Pure-Python package with no runtime dependencies |
+
 ### Python Extension Projects
 
 Generate complete Python extension projects with scikit-build-core:
@@ -293,10 +322,46 @@ make clean    # Remove build artifacts
 
 For traditional virtualenv workflows, use `--env venv` to generate pip/python commands instead.
 
-The `py/pybind11-flex` recipe additionally drops a `project.flex.json` that documents
-how to toggle the native Catch2/GTest harness and the optional embedded CLI using
-`cmake -D` flags. Update its `options` block and rerun `cmake` to explore
-different combinations without re-running `buildgen new`.
+### Pure Python Projects
+
+The `py/nodeps` recipe generates a pure-Python package with no runtime
+dependencies and no compiler in the loop:
+
+```bash
+buildgen new mypkg -r py/nodeps
+```
+
+```text
+mypkg/
+  pyproject.toml      # hatchling backend, dependencies = []
+  Makefile            # Convenience wrapper
+  src/mypkg/
+    __init__.py       # Python package
+    core.py           # Example module (standard library only)
+    py.typed          # PEP 561 marker
+  tests/
+    test_mypkg.py     # pytest tests
+  .github/workflows/  # ci.yml + publish.yml
+```
+
+Differences from the extension recipes: hatchling replaces scikit-build-core,
+there is no `CMakeLists.txt`, the CI build leg runs on a single runner (one
+`py3-none-any` wheel serves every platform), and publishing uses a plain
+sdist/wheel workflow rather than cibuildwheel. Development tooling (pytest,
+ruff, mypy) lives in the `dev` dependency group, so it is not part of the
+published distribution. The generated test suite asserts that the installed
+distribution declares no runtime requirements, so the invariant is enforced
+rather than merely documented.
+
+The `py/pybind11-flex` recipe additionally drops a `project.flex.json` whose
+`options` block toggles the native Catch2/GTest harness and the optional
+embedded CLI. Those three values are the only inputs to the render: they are
+baked into `pyproject.toml`'s `[tool.scikit-build.cmake.define]` table and into
+the `option()` defaults in `CMakeLists.txt`. To explore a different combination,
+edit the block and run `buildgen render` again -- re-running `cmake` by itself
+will not pick up a change, because scikit-build-core re-applies its own defines
+on every build. The rendered `project.json` records the equivalent `cmake -D`
+flags for reference.
 
 ### Configurable Recipe Workflow
 
@@ -441,6 +506,24 @@ cp $(buildgen templates show py/pybind11 | grep pyproject) .buildgen/templates/p
 # Edit your local copy
 ```
 
+### Limitation: Mako includes are not resolved through the override chain
+
+Override resolution applies to the files listed by `buildgen templates show` --
+the entries in a recipe's file map. It does **not** apply to templates pulled in
+by a Mako `<%include>` directive from inside another template. The `py/*`
+recipes use one such include: every `pyproject.toml.mako` includes
+`common/pyproject.base.toml.mako`, which Mako resolves relative to the including
+template's own directory and the built-in `py/` root only.
+
+Practical consequence: dropping a file at
+`~/.buildgen/templates/py/common/pyproject.base.toml.mako` has no effect and
+produces no warning. To customize the shared pyproject base, override the
+recipe's `pyproject.toml.mako` instead -- either replace the include with your
+own content, or keep the include and place your modified base alongside your
+override at `.buildgen/templates/py/pybind11/common/pyproject.base.toml.mako`,
+which Mako *will* find because it sits under the overriding template's
+directory.
+
 ## Low-Level API
 
 For fine-grained control, use the generators directly:
@@ -451,6 +534,7 @@ from buildgen import MakefileGenerator, CMakeListsGenerator
 # Makefile
 gen = MakefileGenerator("Makefile")
 gen.add_cxxflags("-Wall", "-std=c++17")
+gen.add_target("all", deps=["myapp"])  # declared first, so it is the default goal
 gen.add_target("myapp", "$(CXX) $(CXXFLAGS) -o $@ $^", deps=["main.o"])
 gen.add_pattern_rule("%.o", "%.cpp", "$(CXX) $(CXXFLAGS) -c $< -o $@")
 gen.add_phony("all", "clean")

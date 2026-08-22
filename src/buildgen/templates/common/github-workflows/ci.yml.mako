@@ -13,6 +13,11 @@ _vt = lambda v: tuple(int(p) for p in v.split("."))
 if _vt(python_version) < _vt(min_python):
     python_version = min_python
 _matrix_versions = [min_python] if min_python == python_version else [min_python, python_version]
+# pure_python: no compiled extension, so one wheel serves every platform and
+# the build leg collapses to a single runner.
+pure_python = bool(opts.get("pure_python", False))
+_matrix_os = ["ubuntu-latest"] if pure_python else ["ubuntu-latest", "macos-latest", "windows-latest"]
+_build_step = "Build wheel" if pure_python else "Build extension"
 %>\
 name: CI
 
@@ -38,7 +43,7 @@ jobs:
       - uses: actions/checkout@v7
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v8
+        uses: astral-sh/setup-uv@v10
         with:
           enable-cache: true
 
@@ -74,14 +79,14 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
+        os: [${", ".join(_matrix_os)}]
         python-version: [${", ".join('"%s"' % v for v in _matrix_versions)}]
 
     steps:
       - uses: actions/checkout@v7
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v8
+        uses: astral-sh/setup-uv@v10
         with:
           enable-cache: true
 
@@ -91,7 +96,7 @@ jobs:
       - name: Install dependencies
         run: uv sync
 
-      - name: Build extension
+      - name: ${_build_step}
         run: uv build --wheel
 
       - name: Run tests

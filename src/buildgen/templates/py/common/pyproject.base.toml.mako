@@ -1,4 +1,4 @@
-<%page args="name, framework, framework_pkg, description, lang_classifier, defaults={}, user={}, options={}, dep_versions={}" />
+<%page args="name, framework, framework_pkg, description, lang_classifier, defaults={}, user={}, options={}, dep_versions={}, native=True, keywords=None" />
 <%
 # Handle optional extra build requirements
 extra_requires = f', "{framework_pkg}"' if framework_pkg else ''
@@ -9,6 +9,8 @@ _dv = dep_versions if isinstance(dep_versions, dict) else {}
 # Python version classifiers span the requires-python floor up to the latest known release
 _py_min_minor = int(_python_version.split(".")[1])
 _py_max_minor = max(14, _py_min_minor)
+# native=False -> pure-Python distribution: no compiler, no CMake, hatchling backend.
+_keywords = keywords if keywords else ([framework, "python", "extension"] if native else ["python", "library"])
 %>
 [project]
 name = "${name}"
@@ -30,14 +32,24 @@ authors = [
 ]
 % endif
 requires-python = ">=${_python_version}"
-keywords = ["${framework}", "python", "extension"]
+keywords = [${", ".join('"%s"' % k for k in _keywords)}]
+% if not native:
+# This project intentionally has no runtime dependencies.
+dependencies = []
+% endif
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Programming Language :: Python :: 3",
 % for _minor in range(_py_min_minor, _py_max_minor + 1):
     "Programming Language :: Python :: 3.${_minor}",
 % endfor
+% if lang_classifier:
     "Programming Language :: ${lang_classifier}",
+% endif
+% if not native:
+    "Programming Language :: Python :: Implementation :: CPython",
+    "Programming Language :: Python :: Implementation :: PyPy",
+% endif
     "Typing :: Typed",
 ]
 
@@ -47,9 +59,10 @@ dev = [
     "pytest>=${_dv.get('pytest', '8.4.2')}",
     "pytest-cov>=${_dv.get('pytest-cov', '7.0.0')}",
     "ruff>=${_dv.get('ruff', '0.14.9')}",
-    "twine>=${_dv.get('twine', '6.2.0')}",
+    "twine>=${_dv.get('twine', '7.0.0')}",
 ]
 
+% if native:
 [build-system]
 requires = ["scikit-build-core>=${_dv.get('scikit-build-core', '0.12')}"${extra_requires}]
 build-backend = "scikit_build_core.build"
@@ -63,3 +76,14 @@ cmake.source-dir = "."
 sdist.include = []
 sdist.exclude = []
 wheel.exclude = []
+% else:
+[build-system]
+requires = ["hatchling>=${_dv.get('hatchling', '1.27.0')}"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/${name}"]
+
+[tool.hatch.build.targets.sdist]
+include = ["src/${name}", "tests", "README.md", "LICENSE", "CHANGELOG.md"]
+% endif

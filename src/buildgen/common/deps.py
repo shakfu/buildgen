@@ -7,6 +7,7 @@ with fallback to bundled defaults when offline or on error.
 import json
 import urllib.request
 import urllib.error
+from concurrent.futures import ThreadPoolExecutor
 from typing import Optional
 
 
@@ -17,18 +18,24 @@ DEFAULT_VERSIONS: dict[str, str] = {
     "pytest": "8.4.2",
     "pytest-cov": "7.0.0",
     "ruff": "0.14.9",
-    "twine": "6.2.0",
+    "twine": "7.0.0",
     "pybind11-stubgen": "0.14",
     "scikit-build-core": "0.12",
+    "hatchling": "1.27.0",
 }
 
 # Packages whose version floor is a compatibility constraint, not a freshness
 # target.  resolve_latest_versions() still updates them, but callers can
 # choose to treat them differently.
-BUILD_SYSTEM_PACKAGES = frozenset({"scikit-build-core"})
+BUILD_SYSTEM_PACKAGES = frozenset({"scikit-build-core", "hatchling"})
 
 _PYPI_URL = "https://pypi.org/pypi/{}/json"
-_TIMEOUT = 5  # seconds per request
+# Kept short: this runs on the generation path, the fallback is always correct,
+# and a PyPI that has not answered in two seconds is not worth waiting on.
+_TIMEOUT = 2  # seconds per request
+# Requests are independent, so the offline worst case is one timeout rather
+# than one per package.
+_MAX_WORKERS = 8
 
 
 def _fetch_latest_version(package: str) -> Optional[str]:
@@ -57,15 +64,18 @@ def resolve_latest_versions(
     """
     if packages is None:
         packages = list(DEFAULT_VERSIONS.keys())
+    if not packages:
+        return {}
 
-    versions: dict[str, str] = {}
-    for pkg in packages:
-        latest = _fetch_latest_version(pkg)
-        if latest is not None:
-            versions[pkg] = latest
-        else:
-            versions[pkg] = DEFAULT_VERSIONS.get(pkg, "0")
-    return versions
+    workers = min(_MAX_WORKERS, len(packages))
+    with ThreadPoolExecutor(max_workers=workers) as pool:
+        latest = list(pool.map(_fetch_latest_version, packages))
+
+    # Built in the caller's package order so output stays deterministic.
+    return {
+        pkg: found if found is not None else DEFAULT_VERSIONS.get(pkg, "0")
+        for pkg, found in zip(packages, latest)
+    }
 
 
 def get_default_versions(

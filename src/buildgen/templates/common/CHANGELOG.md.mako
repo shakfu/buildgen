@@ -4,6 +4,9 @@ today = datetime.now().strftime("%Y-%m-%d")
 # Mako treats a line-leading "##" as a comment, so emit Markdown headings via vars.
 h2 = "##"
 h3 = "###"
+_opts = context.get("options") or {}
+_pure = bool(_opts.get("pure_python", False))
+_backend = "hatchling" if _pure else "scikit-build-core"
 %>\
 # Changelog
 
@@ -21,4 +24,4 @@ ${h3} Added
 - Initial project structure
 - Core module with example functions
 - Test suite with pytest
-- Build system using scikit-build-core
+- Build system using ${_backend}

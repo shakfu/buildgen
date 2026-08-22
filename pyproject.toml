@@ -56,13 +56,28 @@ dev = [
     "pytest>=8.4.2",
     "pytest-cov>=7.0.0",
     "ruff>=0.14.9",
-    "twine>=6.2.0",
+    "twine>=7.0.0",
     "types-PyYAML>=6.0.0",
 ]
 
 [build-system]
-requires = ["uv_build>=0.11.25,<0.12"]
-build-backend = "uv_build"
+requires = ["hatchling>=1.27.0"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/buildgen"]
+
+[tool.hatch.build.targets.sdist]
+include = [
+    "src/buildgen",
+    "tests",
+    "scripts",
+    "Makefile",
+    "README.md",
+    "CHANGELOG.md",
+    "TODO.md",
+    "LICENSE",
+]
 
 [tool.mypy]
 disable_error_code = ["import-untyped"]

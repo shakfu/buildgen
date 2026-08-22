@@ -1,0 +1,105 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  qa:
+    name: QA (py${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.14"]
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v10
+        with:
+          enable-cache: true
+
+      - name: Set up Python ${{ matrix.python-version }}
+        run: uv python install ${{ matrix.python-version }}
+
+      - name: Install dependencies
+        run: uv sync --dev
+
+      - name: Lint with ruff
+        run: uv run ruff check src tests
+
+      - name: Check formatting with ruff
+        run: uv run ruff format --check src tests
+
+      - name: Type check with mypy
+        run: uv run mypy src
+
+      - name: Run tests
+        run: uv run pytest
+
+  # The generated projects claim macOS and Windows support via their own CI
+  # matrix, so the generators have to be exercised there too. Building the
+  # scikit-build recipes needs a full native toolchain per runner and is slow,
+  # so those builds stay on the Linux leg above.
+  cross-platform:
+    name: Tests (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    # Informational for now: this leg has never run, so it is expected to
+    # surface genuine portability gaps in the generated CMake recipes. Drop
+    # continue-on-error once it is green.
+    continue-on-error: true
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest]
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v10
+        with:
+          enable-cache: true
+
+      - name: Install dependencies
+        run: uv sync --dev
+
+      - name: Run tests
+        run: uv run pytest --skip-skbuild-build
+
+  build:
+    name: Build distribution
+    needs: qa
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v10
+        with:
+          enable-cache: true
+
+      - name: Install dependencies
+        run: uv sync --dev
+
+      - name: Build and check
+        run: make build
+
+      - name: Upload distribution
+        uses: actions/upload-artifact@v7
+        with:
+          name: dist
+          path: dist/
+          retention-days: 7

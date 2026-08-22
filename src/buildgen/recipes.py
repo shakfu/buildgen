@@ -3,11 +3,11 @@
 Recipes use a `category/variant` naming convention:
 - cpp/executable, cpp/static, cpp/shared, etc.
 - c/executable, c/static, c/shared, etc.
-- py/pybind11, py/nanobind, py/cython, py/cext
+- py/pybind11, py/nanobind, py/cython, py/cext, py/nodeps
 """
 
 from dataclasses import dataclass, field
-from typing import Optional, Any
+from typing import Any, Callable, Optional
 
 
 @dataclass
@@ -18,12 +18,21 @@ class Recipe:
     description: str
     category: str  # e.g., "cpp", "c", "py"
     variant: str  # e.g., "executable", "pybind11"
-    build_system: str  # "cmake" or "skbuild"
-    language: str  # "c", "cpp", "cython"
+    build_system: str  # "cmake", "skbuild", or "python" (pure Python, no native build)
+    language: str  # "c", "cpp", "cython", "python"
     framework: Optional[str] = None  # "pybind11", "nanobind", etc.
     configurable: bool = False
     config_template: Optional[str] = None
     default_options: dict[str, Any] = field(default_factory=dict)
+    # Key into buildgen.skbuild.templates.TEMPLATE_FILES. Defaults to the
+    # legacy "skbuild-{framework}" name; recipes with no native framework
+    # (e.g. py/nodeps) set it to their recipe path instead.
+    template_key: Optional[str] = None
+
+    @property
+    def template_type(self) -> str:
+        """Template-registry key for this recipe's file map."""
+        return self.template_key or f"skbuild-{self.framework}"
 
 
 # Recipe registry with category/variant naming
@@ -195,6 +204,17 @@ RECIPES: dict[str, Recipe] = {
         language="c",
         framework="c",
     ),
+    "py/nodeps": Recipe(
+        name="py/nodeps",
+        description="Pure-Python package with no runtime dependencies",
+        category="py",
+        variant="nodeps",
+        build_system="python",
+        language="python",
+        framework=None,
+        template_key="py/nodeps",
+        default_options={"env": "uv", "pure_python": True},
+    ),
 }
 
 # Legacy type names mapped to new recipe names
@@ -213,6 +233,31 @@ LEGACY_TYPE_MAPPING: dict[str, str] = {
     "app-with-lib": "cpp/app-with-lib",
     "full": "cpp/full",
 }
+
+
+def _pybind11_flex_derived(options: dict[str, Any]) -> dict[str, Any]:
+    """Options the py/pybind11-flex templates compute from other options."""
+    return {"build_cpp_tests": options.get("test_framework", "none") != "none"}
+
+
+# Options that are derived rather than user-set. The recipe templates compute
+# these internally; resolving them here as well keeps the rendered project
+# config in agreement with what the render actually bakes in.
+DERIVED_OPTIONS: dict[str, Callable[[dict[str, Any]], dict[str, Any]]] = {
+    "py/pybind11-flex": _pybind11_flex_derived,
+}
+
+
+def resolve_derived_options(
+    recipe_name: str, options: dict[str, Any]
+) -> dict[str, Any]:
+    """Return *options* extended with any derived values for *recipe_name*."""
+    derive = DERIVED_OPTIONS.get(resolve_recipe_name(recipe_name))
+    if derive is None:
+        return options
+    merged = dict(options)
+    merged.update(derive(options))
+    return merged
 
 
 def get_recipe(name: str) -> Recipe:

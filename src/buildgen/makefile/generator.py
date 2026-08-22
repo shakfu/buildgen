@@ -37,6 +37,9 @@ class MakefileGenerator(BaseGenerator):
     def __init__(self, path: PathLike, strict: bool = False):
         super().__init__(path, strict)
         self.cxx = "g++"
+        # Emitted only when set: projects with no C sources should not carry a
+        # CC assignment that overrides make's own default.
+        self.cc: Optional[str] = None
         self.pattern_rules: UniqueList = UniqueList()
         self.includes: UniqueList = UniqueList()
         self.includes_optional: UniqueList = UniqueList()
@@ -57,7 +60,13 @@ class MakefileGenerator(BaseGenerator):
         self.writer.close()
 
     def check_dir(self, path: PathLike) -> bool:
-        """Check if a path is a valid directory."""
+        """Check whether *path* is usable as a directory reference.
+
+        A ``$(VAR)`` reference is resolved when the generator already knows the
+        variable, and accepted when it does not: the variable may be defined by
+        an include, by the environment, or by a later ``add_variable`` call, so
+        rejecting it here would make validation depend on call order.
+        """
         defaults = {"HOME": "$(HOME)", "PWD": "$(PWD)", "CURDIR": "$(CURDIR)"}
         str_path = str(path)
         if str(path) in defaults.values():
@@ -67,13 +76,12 @@ class MakefileGenerator(BaseGenerator):
             key = match.group(1)
             if key in defaults:
                 return True
-            assert key in self.vars, f"Invalid variable: {key}"
-            var = self.vars[key]
+            var = self.vars.get(key)
+            if var is None:
+                # Resolved by make at build time, not by us at generation time.
+                return True
             var_value = var.value if isinstance(var, Var) else str(var)
-            assert os.path.isdir(var_value), (
-                f"Value of variable {key} is not a directory: {var_value}"
-            )
-            return True
+            return os.path.isdir(var_value)
         return os.path.isdir(str_path)
 
     def _normalize_path(self, path: str) -> str:
@@ -98,20 +106,28 @@ class MakefileGenerator(BaseGenerator):
         *entries,
         **kwargs,
     ) -> None:
-        """Add an entry or variable to the Makefile."""
-        assert hasattr(self, attr), f"Invalid attribute: {attr}"
+        """Add an entry or variable to the Makefile.
+
+        Validation failures raise ValueError rather than asserting: assertions
+        are stripped under ``python -O``, which would make the generator accept
+        silently-wrong input depending on how the interpreter was started.
+        """
+        if not hasattr(self, attr):
+            raise ValueError(f"Invalid attribute: {attr}")
         _list = getattr(self, attr)
         if not test_func:
             test_func = always_true
         for entry in entries:
-            assert test_func(entry), f"Invalid entry: {entry}"
+            if not test_func(entry):
+                raise ValueError(f"Invalid entry for {attr}: {entry}")
             if entry in _list:
                 if self.strict:
                     raise ValueError(f"entry: {entry} already exists in {attr} list")
                 continue
             _list.append(f"{prefix}{entry}")
         for key, value in kwargs.items():
-            assert test_func(value), f"Invalid value: {value}"
+            if not test_func(value):
+                raise ValueError(f"Invalid value for {attr} variable {key}: {value}")
             if key in self.vars:
                 if self.strict:
                     raise ValueError(f"variable: {key} already exists in vars dict")
@@ -301,6 +317,8 @@ class MakefileGenerator(BaseGenerator):
             self.write(f"LINKDIRS = {link_dirs}")
         self.write()
 
+        if self.cc:
+            self.write(f"CC = {self.cc}")
         self.write(f"CXX = {self.cxx}")
         if self.cflags:
             cflags = " ".join(self.cflags)
@@ -351,8 +369,12 @@ class MakefileGenerator(BaseGenerator):
                 self.write()
 
     def _write_targets(self) -> None:
-        """Write targets to the Makefile."""
-        for target in sorted(self.targets):
+        """Write targets to the Makefile in the order they were declared.
+
+        Order is significant: make takes the first target in the file as the
+        default goal, so callers control it by declaring that target first.
+        """
+        for target in self.targets:
             self.write(target)
             self.write()
 

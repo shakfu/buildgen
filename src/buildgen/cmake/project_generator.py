@@ -241,5 +241,14 @@ class CMakeProjectGenerator:
 
 
 def is_cmake_recipe(recipe: str) -> bool:
-    """Check if a recipe is a CMake-based recipe (cpp/* or c/*)."""
-    return recipe in CMakeProjectGenerator.TEMPLATE_FILES
+    """Check whether *recipe* is a CMake-based recipe (cpp/* or c/*).
+
+    Answers from the recipe registry, not from this module's template map, so
+    a recipe registered as CMake-based but missing its templates reports as
+    CMake-based and fails later with a message naming the missing template set.
+    Callers dispatching to a generator should test ``build_system`` directly.
+    """
+    from buildgen.recipes import RECIPES, resolve_recipe_name
+
+    entry = RECIPES.get(resolve_recipe_name(recipe))
+    return entry is not None and entry.build_system == "cmake"

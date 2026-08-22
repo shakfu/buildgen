@@ -762,3 +762,106 @@ class TestCLI:
         assert "all:" in content
         assert "clean:" in content
         assert "%.o: %.cpp" in content
+
+
+class TestTargetOrdering:
+    """Targets are emitted in declaration order, which sets make's default goal."""
+
+    def test_declaration_order_is_preserved(self, tmp_path):
+        makefile = tmp_path / "Makefile"
+        gen = MakefileGenerator(makefile)
+        gen.add_target("zebra", "@echo zebra")
+        gen.add_target("alpha", "@echo alpha")
+        gen.add_target("middle", "@echo middle")
+        gen.generate()
+
+        content = makefile.read_text()
+        positions = [content.index(f"{name}:") for name in ("zebra", "alpha", "middle")]
+        assert positions == sorted(positions), "targets were reordered"
+
+    def test_first_declared_target_is_the_default_goal(self, tmp_path):
+        """A target that sorts late must still be able to be the default goal."""
+        makefile = tmp_path / "Makefile"
+        gen = MakefileGenerator(makefile)
+        gen.add_target("zzz_default", deps=["alpha"])
+        gen.add_target("alpha", "@echo alpha")
+        gen.generate()
+
+        body = makefile.read_text().split("# Pattern rules")[-1]
+        assert body.index("zzz_default:") < body.index("alpha:")
+
+    def test_config_makefile_defaults_to_all(self, tmp_path):
+        """The config-driven generator keeps `all` as the default goal."""
+        from buildgen.common.project import ProjectConfig, TargetConfig
+
+        makefile = tmp_path / "Makefile"
+        config = ProjectConfig(
+            name="p",
+            targets=[
+                TargetConfig(name="aaa", sources=["a.cpp"]),
+                TargetConfig(name="zzz", sources=["z.cpp"]),
+            ],
+        )
+        config.generate_makefile(makefile)
+
+        content = makefile.read_text()
+        assert content.index("all:") < content.index("aaa:") < content.index("zzz:")
+
+    def test_all_lists_the_emitted_library_names(self, tmp_path):
+        """Library targets appear in `all` under their produced file names."""
+        from buildgen.common.project import ProjectConfig, TargetConfig
+
+        makefile = tmp_path / "Makefile"
+        config = ProjectConfig(
+            name="p",
+            targets=[
+                TargetConfig(name="s", target_type="static", sources=["s.cpp"]),
+                TargetConfig(name="d", target_type="shared", sources=["d.cpp"]),
+                TargetConfig(name="e", sources=["e.cpp"]),
+            ],
+        )
+        config.generate_makefile(makefile)
+
+        content = makefile.read_text()
+        assert "all: libs.a libd.so e" in content
+
+
+class TestValidationErrors:
+    """Input validation must not depend on assertions or on call order."""
+
+    def test_missing_directory_raises_value_error(self, tmp_path):
+        """A ValueError survives `python -O`; an AssertionError would not."""
+        gen = MakefileGenerator(tmp_path / "Makefile")
+        with pytest.raises(ValueError, match="include_dirs"):
+            gen.add_include_dirs(str(tmp_path / "does-not-exist"))
+
+    def test_invalid_attribute_raises_value_error(self, tmp_path):
+        gen = MakefileGenerator(tmp_path / "Makefile")
+        with pytest.raises(ValueError, match="Invalid attribute"):
+            gen._add_entry_or_variable("no_such_list", "", None, "x")
+
+    def test_unknown_variable_reference_is_accepted(self, tmp_path):
+        """`$(VAR)` may be defined by an include or the environment."""
+        gen = MakefileGenerator(tmp_path / "Makefile")
+        gen.add_include_dirs("$(BOOST_ROOT)/include")
+        assert any("BOOST_ROOT" in entry for entry in gen.include_dirs)
+
+    def test_variable_reference_order_does_not_matter(self, tmp_path):
+        """Referencing a variable before defining it must behave the same."""
+        before = MakefileGenerator(tmp_path / "before")
+        before.add_variable("LIBDIR", str(tmp_path))
+        before.add_include_dirs("$(LIBDIR)")
+
+        after = MakefileGenerator(tmp_path / "after")
+        after.add_include_dirs("$(LIBDIR)")
+        after.add_variable("LIBDIR", str(tmp_path))
+
+        assert list(before.include_dirs) == list(after.include_dirs)
+
+    def test_known_variable_pointing_at_a_file_is_rejected(self, tmp_path):
+        not_a_dir = tmp_path / "file.txt"
+        not_a_dir.write_text("x")
+        gen = MakefileGenerator(tmp_path / "Makefile")
+        gen.add_variable("BADDIR", str(not_a_dir))
+        with pytest.raises(ValueError, match="include_dirs"):
+            gen.add_include_dirs("$(BADDIR)")

@@ -1,8 +1,13 @@
 {
   "_notes": [
     "Configurable recipe produced by py/pybind11-flex.",
-    "1. Edit the options block.",
-    "2. Run `buildgen render project.flex.json`."
+    "1. Edit the options block below -- these three values are the only",
+    "   inputs to the render.",
+    "2. Run `buildgen render project.flex.json`.",
+    "The render bakes the chosen options into pyproject.toml's",
+    "[tool.scikit-build.cmake.define] table and into the CMakeLists.txt",
+    "option() defaults, so a rebuild picks them up with no extra flags.",
+    "To try a different combination, edit this file and render again."
   ],
   "name": "${name}",
   "version": "0.1.0",
@@ -17,53 +22,14 @@
     "test_framework": "Choose catch2, gtest, or none to disable native harness.",
     "build_examples": "Flip to true to compile the CLI helper that embeds Python."
   },
-  "compile_options": [
-    "-Wall",
-    "-Wextra",
-    "-O2"
+  "_cmake_help": [
+    "The flags below are what the render bakes in. They are recorded here so",
+    "you can reproduce the same configuration from a bare `cmake` invocation;",
+    "scikit-build-core does not read them from this file."
   ],
   "cmake_options": [
-    "-DBUILD_CPP_TESTS=ON",
+    "-DBUILD_CPP_TESTS=<options.build_cpp_tests>",
     "-DTEST_FRAMEWORK=<options.test_framework>",
     "-DBUILD_EMBEDDED_CLI=<options.build_examples>"
-  ],
-  "dependencies": [
-    "pybind11",
-    "Threads",
-    "Catch2",
-    "GTest"
-  ],
-  "targets": [
-    {
-      "name": "${name}_core",
-      "type": "shared",
-      "sources": ["src/${name}/_core.cpp"],
-      "include_dirs": ["src/${name}"],
-      "install": true
-    },
-    {
-      "name": "${name}_tests",
-      "type": "executable",
-      "sources": [
-        "tests/native/test_module.catch2.cpp"
-      ],
-      "link_libraries": [
-        "${name}_core",
-        "Catch2::Catch2WithMain"
-      ],
-      "compile_options": [
-        "-DTEST_FRAMEWORK=<options.test_framework>"
-      ]
-    },
-    {
-      "name": "${name}_cli",
-      "type": "executable",
-      "sources": [
-        "examples/cli/main.cpp"
-      ],
-      "link_libraries": [
-        "pybind11::embed"
-      ]
-    }
   ]
 }

@@ -11,6 +11,27 @@ from typing import Optional
 from buildgen.common.utils import PathLike
 
 
+# Source extensions that decide which compiler drives a translation unit.
+# Anything not listed here is left to make's implicit rules.
+C_SOURCE_EXTENSIONS = frozenset({".c"})
+CXX_SOURCE_EXTENSIONS = frozenset({".cpp", ".cc", ".cxx", ".c++", ".cp"})
+
+
+def _link_flag(name: str, *, lower: bool = False) -> str:
+    """Normalize a library name into a linker flag.
+
+    Names that are already flags (``-lfoo``, ``-Wl,...``) pass through, and
+    CMake-style namespaced targets are reduced to their final component so a
+    dependency written as ``fmt::fmt`` links as ``-lfmt`` rather than the
+    nonsensical ``-lfmt::fmt``.
+    """
+    if name.startswith("-"):
+        return name
+    if "::" in name:
+        name = name.rsplit("::", 1)[-1]
+    return f"-l{name.lower() if lower else name}"
+
+
 @dataclass
 class TargetConfig:
     """Configuration for a build target (executable or library)."""
@@ -253,12 +274,49 @@ class ProjectConfig:
         with open(path, "w", encoding="utf-8") as f:
             yaml.dump(self.to_dict(), f, default_flow_style=False, sort_keys=False)
 
+    def _source_extensions(self) -> tuple[list[str], list[str]]:
+        """Return the (C, C++) source extensions actually used by targets."""
+        extensions = {Path(src).suffix for t in self.targets for src in t.sources}
+        c_exts = sorted(extensions & C_SOURCE_EXTENSIONS)
+        cxx_exts = sorted(extensions & CXX_SOURCE_EXTENSIONS)
+        return c_exts, cxx_exts
+
+    @staticmethod
+    def _emitted_target_name(target: TargetConfig) -> str:
+        """Name of the file a target produces (libraries gain lib/.a/.so)."""
+        if target.target_type in ("static", "STATIC"):
+            return f"lib{target.name}.a"
+        if target.target_type in ("shared", "SHARED"):
+            return f"lib{target.name}.so"
+        return target.name
+
+    def _target_is_c_only(self, target: TargetConfig) -> bool:
+        """True when every source in *target* is C."""
+        suffixes = {Path(src).suffix for src in target.sources}
+        return bool(suffixes) and suffixes <= C_SOURCE_EXTENSIONS
+
     def generate_makefile(self, output_path: PathLike = "Makefile") -> None:
         """Generate Makefile from project configuration."""
         from buildgen.makefile.generator import MakefileGenerator
 
         gen = MakefileGenerator(output_path)
         gen.cxx = self.cxx
+
+        c_exts, cxx_exts = self._source_extensions()
+        declared_c = "C" in {lang.upper() for lang in self.languages}
+        has_c = bool(c_exts) or declared_c
+        if has_c:
+            gen.cc = self.cc
+
+        # Objects are produced by one global pattern rule, so if any target is a
+        # shared library every object has to be position-independent.
+        needs_pic = any(t.target_type.lower() == "shared" for t in self.targets)
+
+        def add_compile_flags(*flags: str) -> None:
+            """Add flags to every compiler in play."""
+            gen.add_cxxflags(*flags)
+            if has_c:
+                gen.add_cflags(*flags)
 
         # Variables
         for key, value in self.variables.items():
@@ -270,17 +328,22 @@ class ProjectConfig:
         if self.link_dirs:
             gen.add_link_dirs(*self.link_dirs)
         if self.compile_options:
-            gen.add_cxxflags(*self.compile_options)
+            add_compile_flags(*self.compile_options)
         if self.link_options:
             gen.add_ldflags(*self.link_options)
 
-        # C++ standard
+        # Language standards
         if self.cxx_standard:
             gen.add_cxxflags(f"-std=c++{self.cxx_standard}")
+        if self.c_standard and has_c:
+            gen.add_cflags(f"-std=c{self.c_standard}")
+
+        if needs_pic:
+            add_compile_flags("-fPIC")
 
         # Compile definitions
         for defn in self.compile_definitions:
-            gen.add_cxxflags(f"-D{defn}")
+            add_compile_flags(f"-D{defn}")
 
         # Dependencies (as libraries to link)
         for dep in self.dependencies:
@@ -288,16 +351,18 @@ class ProjectConfig:
                 gen.add_ldlibs("-lpthread")
             elif not dep.git_repository and not dep.url:
                 # Assume system library
-                gen.add_ldlibs(f"-l{dep.name.lower()}")
+                gen.add_ldlibs(_link_flag(dep.name, lower=True))
 
-        # Targets
-        all_targets = []
+        # Targets. The "all" aggregate is declared before the targets it
+        # depends on, because the generator preserves declaration order and
+        # make takes the first target in the file as the default goal.
         clean_files = []
         phony_targets = ["all", "clean"]
 
-        for target in self.targets:
-            all_targets.append(target.name)
+        all_targets = [self._emitted_target_name(t) for t in self.targets]
+        gen.add_target("all", deps=all_targets)
 
+        for target in self.targets:
             # Object files
             objects = []
             for src in target.sources:
@@ -305,33 +370,39 @@ class ProjectConfig:
                 objects.append(obj)
                 clean_files.append(obj)
 
+            # A C-only target links with the C driver; anything containing C++
+            # needs the C++ driver to pull in the standard library.
+            if has_c and self._target_is_c_only(target):
+                driver, flags = "$(CC)", "$(CFLAGS)"
+            else:
+                driver, flags = "$(CXX)", "$(CXXFLAGS)"
+
             # Link command
             if target.target_type == "executable":
-                link_libs = " ".join(
-                    f"-l{lib}" if not lib.startswith("-") else lib
-                    for lib in target.link_libraries
-                )
-                recipe = f"$(CXX) $(CXXFLAGS) -o $@ $^ $(LDFLAGS) {link_libs}"
-                gen.add_target(target.name, recipe, deps=objects)
+                link_libs = " ".join(_link_flag(lib) for lib in target.link_libraries)
+                recipe = f"{driver} {flags} -o $@ $^ $(LDFLAGS) $(LDLIBS) {link_libs}"
+                gen.add_target(target.name, recipe.rstrip(), deps=objects)
                 clean_files.append(target.name)
             elif target.target_type in ("static", "STATIC"):
                 recipe = "$(AR) rcs $@ $^"
                 lib_name = f"lib{target.name}.a"
                 gen.add_target(lib_name, recipe, deps=objects)
                 clean_files.append(lib_name)
-                all_targets[-1] = lib_name
             elif target.target_type in ("shared", "SHARED"):
-                recipe = "$(CXX) -shared -o $@ $^ $(LDFLAGS)"
+                link_libs = " ".join(_link_flag(lib) for lib in target.link_libraries)
+                recipe = f"{driver} -shared -o $@ $^ $(LDFLAGS) $(LDLIBS) {link_libs}"
                 lib_name = f"lib{target.name}.so"
-                gen.add_target(lib_name, recipe, deps=objects)
+                gen.add_target(lib_name, recipe.rstrip(), deps=objects)
                 clean_files.append(lib_name)
-                all_targets[-1] = lib_name
 
-        # Pattern rule for .o files
-        gen.add_pattern_rule("%.o", "%.cpp", "$(CXX) $(CXXFLAGS) -c $< -o $@")
+        # Pattern rules, one per source extension actually used
+        for ext in cxx_exts:
+            gen.add_pattern_rule("%.o", f"%{ext}", "$(CXX) $(CXXFLAGS) -c $< -o $@")
+        for ext in c_exts:
+            gen.add_pattern_rule("%.o", f"%{ext}", "$(CC) $(CFLAGS) -c $< -o $@")
+        if not c_exts and not cxx_exts:
+            gen.add_pattern_rule("%.o", "%.cpp", "$(CXX) $(CXXFLAGS) -c $< -o $@")
 
-        # all target
-        gen.add_target("all", deps=all_targets)
         gen.add_phony(*phony_targets)
         gen.add_clean(*clean_files)
 
