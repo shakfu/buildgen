@@ -6,6 +6,8 @@ All notable changes to this project will be documented in this file.
 
 ## [0.3.0]
 
+Single place to update tools and dependencies (with update to latest).
+
 ### Added
 
 - **`common/versions.py`** - one registry for every pinned version: PyPI floors, GitHub Action refs, CMake ranges, language standards, Python versions, FetchContent tags. Templates read it instead of holding literals, so a bump touches one file. `deps.DEFAULT_VERSIONS` and `BUILD_SYSTEM_PACKAGES` alias into it. Resolution order is unchanged: a `[deps]` pin beats a PyPI lookup, which beats the registry floor.
