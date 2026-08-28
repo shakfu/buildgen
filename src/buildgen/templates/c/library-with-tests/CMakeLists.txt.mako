@@ -8,6 +8,12 @@ set(CMAKE_C_STANDARD ${defaults.get("c_standard", V.STANDARDS["c"])})
 set(CMAKE_C_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
+if(MSVC)
+    set(WARNING_FLAGS /W4)
+else()
+    set(WARNING_FLAGS -Wall -Wextra)
+endif()
+
 # Library
 add_library(${name} STATIC src/lib.c)
 add_library(${name}::${name} ALIAS ${name})
@@ -17,14 +23,14 @@ target_include_directories(${name} PUBLIC
     $<INSTALL_INTERFACE:include>
 )
 
-target_compile_options(${name} PRIVATE -Wall -Wextra)
+target_compile_options(${name} PRIVATE ${"$"}{WARNING_FLAGS})
 
 # Tests
 enable_testing()
 
 add_executable(${name}_tests tests/test_main.c)
 target_link_libraries(${name}_tests PRIVATE ${name})
-target_compile_options(${name}_tests PRIVATE -Wall -Wextra)
+target_compile_options(${name}_tests PRIVATE ${"$"}{WARNING_FLAGS})
 
 add_test(NAME ${name}_tests COMMAND ${name}_tests)
 

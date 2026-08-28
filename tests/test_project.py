@@ -161,9 +161,10 @@ class TestProjectConfig:
         assert config.dependencies[0].name == "Threads"
         assert config.dependencies[1].name == "OpenSSL"
 
-    def test_from_json(self):
+    def test_from_json(self, tmp_path):
         """Test loading ProjectConfig from JSON file."""
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
+        path = tmp_path / "project.json"
+        with path.open("w") as f:
             json.dump(
                 {
                     "name": "testproject",
@@ -172,16 +173,13 @@ class TestProjectConfig:
                 },
                 f,
             )
-            f.flush()
 
-            config = ProjectConfig.from_json(f.name)
-            assert config.name == "testproject"
-            assert config.version == "2.0.0"
-            assert config.cxx_standard == 17
+        config = ProjectConfig.from_json(str(path))
+        assert config.name == "testproject"
+        assert config.version == "2.0.0"
+        assert config.cxx_standard == 17
 
-            Path(f.name).unlink()
-
-    def test_to_json(self):
+    def test_to_json(self, tmp_path):
         """Test saving ProjectConfig to JSON file."""
         config = ProjectConfig(
             name="testproject",
@@ -189,28 +187,24 @@ class TestProjectConfig:
             cxx_standard=17,
         )
 
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
-            config.to_json(f.name)
+        path = tmp_path / "project.json"
+        config.to_json(str(path))
 
-            with Path(f.name).open() as rf:
-                data = json.load(rf)
+        with path.open() as rf:
+            data = json.load(rf)
 
-            assert data["name"] == "testproject"
-            assert data["version"] == "2.0.0"
-            assert data["cxx_standard"] == 17
+        assert data["name"] == "testproject"
+        assert data["version"] == "2.0.0"
+        assert data["cxx_standard"] == 17
 
-            Path(f.name).unlink()
-
-    def test_load_json_by_extension(self):
+    def test_load_json_by_extension(self, tmp_path):
         """Test ProjectConfig.load() detects JSON by extension."""
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
+        path = tmp_path / "project.json"
+        with path.open("w") as f:
             json.dump({"name": "testproject"}, f)
-            f.flush()
 
-            config = ProjectConfig.load(f.name)
-            assert config.name == "testproject"
-
-            Path(f.name).unlink()
+        config = ProjectConfig.load(str(path))
+        assert config.name == "testproject"
 
     def test_to_dict(self):
         """Test converting ProjectConfig to dict."""
@@ -235,7 +229,7 @@ class TestProjectConfig:
 class TestProjectConfigGeneration:
     """Tests for ProjectConfig generation methods."""
 
-    def test_generate_makefile_simple(self):
+    def test_generate_makefile_simple(self, tmp_path):
         """Test generating a simple Makefile."""
         config = ProjectConfig(
             name="myproject",
@@ -249,19 +243,15 @@ class TestProjectConfigGeneration:
             ],
         )
 
-        with tempfile.NamedTemporaryFile(mode="w", suffix="", delete=False) as f:
-            config.generate_makefile(f.name)
+        path = tmp_path / "Makefile"
+        config.generate_makefile(str(path))
 
-            with Path(f.name).open() as rf:
-                content = rf.read()
+        content = path.read_text()
+        assert "CXX" in content
+        assert "myapp" in content
+        assert "-std=c++17" in content
 
-            assert "CXX" in content
-            assert "myapp" in content
-            assert "-std=c++17" in content
-
-            Path(f.name).unlink()
-
-    def test_generate_cmake_simple(self):
+    def test_generate_cmake_simple(self, tmp_path):
         """Test generating a simple CMakeLists.txt."""
         config = ProjectConfig(
             name="myproject",
@@ -276,18 +266,14 @@ class TestProjectConfigGeneration:
             ],
         )
 
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as f:
-            config.generate_cmake(f.name)
+        path = tmp_path / "CMakeLists.txt"
+        config.generate_cmake(str(path))
 
-            with Path(f.name).open() as rf:
-                content = rf.read()
-
-            assert "cmake_minimum_required" in content
-            assert "project(myproject" in content
-            assert "add_executable(myapp" in content
-            assert "CMAKE_CXX_STANDARD 17" in content
-
-            Path(f.name).unlink()
+        content = path.read_text()
+        assert "cmake_minimum_required" in content
+        assert "project(myproject" in content
+        assert "add_executable(myapp" in content
+        assert "CMAKE_CXX_STANDARD 17" in content
 
     def test_generate_all(self):
         """Test generating both Makefile and CMakeLists.txt."""
@@ -437,14 +423,15 @@ class TestProjectConfigYAML:
 
         return importlib.util.find_spec("yaml") is not None
 
-    def test_from_yaml(self, yaml_available):
+    def test_from_yaml(self, yaml_available, tmp_path):
         """Test loading ProjectConfig from YAML file."""
         if not yaml_available:
             pytest.skip("pyyaml not available")
 
         import yaml
 
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
+        path = tmp_path / "project.yaml"
+        with path.open("w") as f:
             yaml.dump(
                 {
                     "name": "testproject",
@@ -453,16 +440,13 @@ class TestProjectConfigYAML:
                 },
                 f,
             )
-            f.flush()
 
-            config = ProjectConfig.from_yaml(f.name)
-            assert config.name == "testproject"
-            assert config.version == "2.0.0"
-            assert config.cxx_standard == 17
+        config = ProjectConfig.from_yaml(str(path))
+        assert config.name == "testproject"
+        assert config.version == "2.0.0"
+        assert config.cxx_standard == 17
 
-            Path(f.name).unlink()
-
-    def test_to_yaml(self, yaml_available):
+    def test_to_yaml(self, yaml_available, tmp_path):
         """Test saving ProjectConfig to YAML file."""
         if not yaml_available:
             pytest.skip("pyyaml not available")
@@ -475,33 +459,29 @@ class TestProjectConfigYAML:
             cxx_standard=17,
         )
 
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
-            config.to_yaml(f.name)
+        path = tmp_path / "project.yaml"
+        config.to_yaml(str(path))
 
-            with Path(f.name).open() as rf:
-                data = yaml.safe_load(rf)
+        with path.open() as rf:
+            data = yaml.safe_load(rf)
 
-            assert data["name"] == "testproject"
-            assert data["version"] == "2.0.0"
-            assert data["cxx_standard"] == 17
+        assert data["name"] == "testproject"
+        assert data["version"] == "2.0.0"
+        assert data["cxx_standard"] == 17
 
-            Path(f.name).unlink()
-
-    def test_load_yaml_by_extension(self, yaml_available):
+    def test_load_yaml_by_extension(self, yaml_available, tmp_path):
         """Test ProjectConfig.load() detects YAML by extension."""
         if not yaml_available:
             pytest.skip("pyyaml not available")
 
         import yaml
 
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
+        path = tmp_path / "project.yaml"
+        with path.open("w") as f:
             yaml.dump({"name": "testproject"}, f)
-            f.flush()
 
-            config = ProjectConfig.load(f.name)
-            assert config.name == "testproject"
-
-            Path(f.name).unlink()
+        config = ProjectConfig.load(str(path))
+        assert config.name == "testproject"
 
     def test_yaml_import_error(self):
         """Test helpful error message when pyyaml not available."""

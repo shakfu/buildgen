@@ -7,6 +7,12 @@ project(${name} VERSION 1.0.0 LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD ${defaults.get("cxx_standard", V.STANDARDS["cxx"])})
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
+if(MSVC)
+    set(WARNING_FLAGS /W4)
+else()
+    set(WARNING_FLAGS -Wall -Wextra)
+endif()
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 add_library(${name} SHARED src/lib.cpp)
@@ -17,7 +23,7 @@ target_include_directories(${name} PUBLIC
     $<INSTALL_INTERFACE:include>
 )
 
-target_compile_options(${name} PRIVATE -Wall -Wextra)
+target_compile_options(${name} PRIVATE ${"$"}{WARNING_FLAGS})
 
 include(GNUInstallDirs)
 include(CMakePackageConfigHelpers)

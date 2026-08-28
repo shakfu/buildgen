@@ -90,19 +90,19 @@ class TestBuilder:
         assert "-shared" in builder.ldflags
         assert "-fPIC" in builder.ldflags
 
-    def test_builder_add_include_dirs(self):
+    def test_builder_add_include_dirs(self, tmp_path):
         """Test adding include directories"""
         builder = Builder("test")
-        # Use existing directories for testing
-        builder.add_include_dirs("/tmp")
-        assert "-I/tmp" in builder.include_dirs
+        # Builder validates that the directory exists
+        builder.add_include_dirs(str(tmp_path))
+        assert f"-I{tmp_path}" in builder.include_dirs
 
-    def test_builder_add_link_dirs(self):
+    def test_builder_add_link_dirs(self, tmp_path):
         """Test adding link directories"""
         builder = Builder("test")
-        # Use existing directories for testing
-        builder.add_link_dirs("/tmp")
-        assert "-L/tmp" in builder.link_dirs
+        # Builder validates that the directory exists
+        builder.add_link_dirs(str(tmp_path))
+        assert f"-L{tmp_path}" in builder.link_dirs
 
     def test_builder_add_ldlibs(self):
         """Test adding libraries"""
@@ -174,14 +174,14 @@ class TestMakefileGenerator:
         assert "-std=c++11" in generator.cxxflags
         assert "-shared" in generator.ldflags
 
-    def test_add_directories(self, temp_makefile):
+    def test_add_directories(self, temp_makefile, tmp_path):
         """Test adding include and link directories"""
         generator = MakefileGenerator(temp_makefile)
-        generator.add_include_dirs("/tmp")
-        generator.add_link_dirs("/tmp")
+        generator.add_include_dirs(str(tmp_path))
+        generator.add_link_dirs(str(tmp_path))
 
-        assert "-I/tmp" in generator.include_dirs
-        assert "-L/tmp" in generator.link_dirs
+        assert f"-I{tmp_path}" in generator.include_dirs
+        assert f"-L{tmp_path}" in generator.link_dirs
 
     def test_add_libraries(self, temp_makefile):
         """Test adding libraries"""
@@ -327,19 +327,24 @@ class TestIntegration:
         with contextlib.suppress(FileNotFoundError):
             Path(temp_path).unlink()
 
-    def test_builder_integration(self):
+    def test_builder_integration(self, tmp_path):
         """Test Builder with realistic C++ project"""
+        include_dir = tmp_path / "include"
+        include_dir.mkdir()
+        lib_dir = tmp_path / "lib"
+        lib_dir.mkdir()
+
         builder = Builder("myapp")
-        builder.add_include_dirs("/usr/local/include")
+        builder.add_include_dirs(str(include_dir))
         builder.add_cxxflags("-Wall", "-Wextra", "-std=c++17", "-O2")
-        builder.add_ldflags("-Wl,-rpath,/usr/local/lib")
-        builder.add_link_dirs("/usr/local/lib")
+        builder.add_ldflags(f"-Wl,-rpath,{lib_dir}")
+        builder.add_link_dirs(str(lib_dir))
         builder.add_ldlibs("-lpthread", "-lssl", "-lcrypto")
 
         # Test dry run doesn't crash
         builder.build(dry_run=True)
 
-    def test_makefile_generator_integration(self, temp_makefile):
+    def test_makefile_generator_integration(self, temp_makefile, tmp_path):
         """Test MakefileGenerator with realistic project"""
         generator = MakefileGenerator(temp_makefile)
 
@@ -349,8 +354,8 @@ class TestIntegration:
 
         # Add flags and directories
         generator.add_cxxflags("-Wall", "-Wextra", "-std=c++17", "-O2")
-        generator.add_include_dirs("/tmp")
-        generator.add_link_dirs("/tmp")
+        generator.add_include_dirs(str(tmp_path))
+        generator.add_link_dirs(str(tmp_path))
         generator.add_ldlibs("-lpthread", "-lssl")
 
         # Add targets

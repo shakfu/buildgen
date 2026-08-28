@@ -4,6 +4,14 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.3.1]
+
+### Fixed
+
+- **Generated C and C++ CMake projects did not build with MSVC.** The 12 `c/*` and `cpp/*` templates passed `-Wall -Wextra` unconditionally; `cl` rejects `/Wextra` outright (`D8021: invalid numeric argument`). Each template now sets `WARNING_FLAGS` to `/W4` under `if(MSVC)` and to `-Wall -Wextra` otherwise, matching what the `py/*` templates already did.
+
+- **Windows and macOS test failures in the cross-platform CI leg.** Three causes: `tests/test_project.py` unlinked a `NamedTemporaryFile` while it was still open, which Windows refuses; `tests/test_makefilegen.py` passed literal `/tmp` and `/usr/local/include` to `Builder`, which asserts the directory exists (absent on Windows and on arm64 macOS runners); `tests/test_config.py` asserted a forward-slash config path. The affected tests now use the `tmp_path` fixture and compare path components.
+
 ## [0.3.0]
 
 Single place to update tools and dependencies (with update to latest).

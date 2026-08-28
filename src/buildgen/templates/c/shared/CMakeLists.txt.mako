@@ -7,6 +7,12 @@ project(${name} VERSION 1.0.0 LANGUAGES C)
 set(CMAKE_C_STANDARD ${defaults.get("c_standard", V.STANDARDS["c"])})
 set(CMAKE_C_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
+if(MSVC)
+    set(WARNING_FLAGS /W4)
+else()
+    set(WARNING_FLAGS -Wall -Wextra)
+endif()
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 add_library(${name} SHARED src/lib.c)
@@ -17,7 +23,7 @@ target_include_directories(${name} PUBLIC
     $<INSTALL_INTERFACE:include>
 )
 
-target_compile_options(${name} PRIVATE -Wall -Wextra)
+target_compile_options(${name} PRIVATE ${"$"}{WARNING_FLAGS})
 
 include(GNUInstallDirs)
 include(CMakePackageConfigHelpers)

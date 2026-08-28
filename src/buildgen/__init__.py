@@ -10,7 +10,7 @@ For additional components, import from submodules:
     from buildgen.common.project import TargetConfig, DependencyConfig
 """
 
-__version__ = "0.3.0"
+__version__ = "0.3.1"
 
 # Core API - minimal exports for early development flexibility
 from buildgen.cmake.generator import CMakeListsGenerator

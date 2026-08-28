@@ -19,7 +19,7 @@ release tags (``v8.2.0``) unconditionally.
 Examples::
 
     python scripts/update_workflow_actions.py            # dry run, show changes
-    python scripts/update_workflow_actions.py --write     # apply changes
+    python scripts/update_workflow_actions.py --write    # apply changes
     python scripts/update_workflow_actions.py --style full --write
 
 Auth: prefers the ``gh`` CLI (uses its stored credentials). Falls back to a

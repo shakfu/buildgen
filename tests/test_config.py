@@ -2,6 +2,7 @@
 
 import argparse
 import textwrap
+from pathlib import Path
 
 import pytest
 
@@ -345,7 +346,7 @@ class TestConfigCLICommands:
         cmd_config_path(args)
 
         output = capsys.readouterr().out.strip()
-        assert ".buildgen/config.toml" in output
+        assert Path(output).parts[-2:] == (".buildgen", "config.toml")
 
 
 class TestDefaultsAppliedToEnvTool:
