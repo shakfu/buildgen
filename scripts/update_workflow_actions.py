@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """Update GitHub Actions pins in workflow files to their latest releases.
 
-Scans this repo's real workflows (``.github/workflows``) and the generated-project
-workflow templates (``src/buildgen/templates/**/github-workflows``) for
-``uses: owner/repo@ref`` lines, looks up each action's latest release via the
-GitHub API, and rewrites the ref.
+Scans this repo's real workflows (``.github/workflows``) for ``uses: owner/repo@ref``
+lines and the ``ACTIONS`` table in ``src/buildgen/common/versions.py``, which is
+what the generated-project workflow templates render their refs from. Looks up
+each action's latest release via the GitHub API and rewrites the ref.
 
 Convention: refs are normalized to the shortest *floating* tag an action
 actually publishes, so a reference tracks upstream patch releases without
@@ -57,13 +57,31 @@ def should_update(ref: str) -> bool:
     return bool(VERSION_TAG_RE.match(ref) or SHA_RE.match(ref))
 
 
-# Directories scanned, relative to the repo root. Both literal workflows and
-# the .mako templates that generate downstream workflows.
+# The generated-project workflow templates no longer carry literal refs; they
+# render them from buildgen.common.versions.ACTIONS, so that table is scanned
+# and rewritten like a workflow file.
+REGISTRY_REL = "src/buildgen/common/versions.py"
+
+# An ACTIONS entry: `    "owner/repo": "v7",`
+REGISTRY_RE = re.compile(
+    r'(?P<prefix>^\s*")(?P<action>[\w.-]+/[\w.-]+)(?P<mid>":\s*")(?P<ref>[\w./-]+)"',
+    re.MULTILINE,
+)
+
+# Paths scanned, relative to the repo root. This repo's own workflows, plus the
+# registry that feeds the generated ones. The template glob is kept so a
+# hand-written ref in a custom template is still caught.
 SCAN_GLOBS = (
     ".github/workflows/*.yml",
     ".github/workflows/*.yaml",
     "src/buildgen/templates/**/github-workflows/*",
+    REGISTRY_REL,
 )
+
+
+def pin_re(path: Path) -> re.Pattern[str]:
+    """The pin pattern for *path*: registry entries, or `uses:` lines."""
+    return REGISTRY_RE if path.name == "versions.py" else USES_RE
 
 
 @dataclass(frozen=True)
@@ -231,7 +249,7 @@ def plan_changes(files: list[Path], resolver: Resolver, style: str) -> list[Chan
     changes: list[Change] = []
     for path in files:
         text = path.read_text(encoding="utf-8")
-        for m in USES_RE.finditer(text):
+        for m in pin_re(path).finditer(text):
             action, ref = m.group("action"), m.group("ref")
             if not should_update(ref):
                 continue  # leave branch/floating refs (release/v1, main) alone
@@ -249,6 +267,7 @@ def apply_changes(files: list[Path], resolver: Resolver, style: str) -> int:
         text = path.read_text(encoding="utf-8")
 
         def repl(m: re.Match) -> str:
+            """Replace only the ref span, so both pin shapes share one path."""
             nonlocal applied
             action, ref = m.group("action"), m.group("ref")
             if not should_update(ref):
@@ -257,9 +276,10 @@ def apply_changes(files: list[Path], resolver: Resolver, style: str) -> int:
             if new_ref is None or new_ref == ref:
                 return m.group(0)
             applied += 1
-            return f"{m.group('prefix')}{action}@{new_ref}"
+            start, end = m.span("ref")
+            return m.group(0)[: start - m.start()] + new_ref + m.group(0)[end - m.start() :]
 
-        new_text = USES_RE.sub(repl, text)
+        new_text = pin_re(path).sub(repl, text)
         if new_text != text:
             path.write_text(new_text, encoding="utf-8")
     return applied

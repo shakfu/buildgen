@@ -3,10 +3,9 @@
 import os
 import subprocess
 from pathlib import Path
-from typing import Optional, Union
 
-from buildgen.common.utils import UniqueList, PathLike
 from buildgen.common.base import BaseBuilder
+from buildgen.common.utils import PathLike, UniqueList
 
 
 def cmake_bool(value: bool) -> str:
@@ -21,7 +20,7 @@ class CMakeBuilder(BaseBuilder):
         self,
         source_dir: PathLike = ".",
         build_dir: PathLike = "build",
-        target: Optional[str] = None,
+        target: str | None = None,
         strict: bool = False,
     ):
         """Initialize CMakeBuilder.
@@ -37,13 +36,13 @@ class CMakeBuilder(BaseBuilder):
         self.build_dir = Path(build_dir)
 
         # CMake options
-        self.generator: Optional[str] = None
-        self.cmake_options: dict[str, Union[str, bool, int]] = {}
+        self.generator: str | None = None
+        self.cmake_options: dict[str, str | bool | int] = {}
         self.cache_scripts: UniqueList = UniqueList()
         self.build_config: str = "Release"
-        self.parallel_jobs: Optional[int] = None
+        self.parallel_jobs: int | None = None
         self.build_targets: UniqueList = UniqueList()
-        self.install_prefix: Optional[str] = None
+        self.install_prefix: str | None = None
 
         # Environment
         self.env_vars: dict[str, str] = {}
@@ -52,7 +51,7 @@ class CMakeBuilder(BaseBuilder):
         """Set CMake generator (e.g., 'Ninja', 'Unix Makefiles')."""
         self.generator = generator
 
-    def set_option(self, name: str, value: Union[str, bool, int]) -> None:
+    def set_option(self, name: str, value: str | bool | int) -> None:
         """Set a CMake option (-D)."""
         self.cmake_options[name] = value
 
@@ -134,7 +133,7 @@ class CMakeBuilder(BaseBuilder):
         env.update(self.env_vars)
         return env
 
-    def _format_cmake_value(self, value: Union[str, bool, int]) -> str:
+    def _format_cmake_value(self, value: str | bool | int) -> str:
         """Format a value for CMake command line."""
         if isinstance(value, bool):
             return cmake_bool(value)

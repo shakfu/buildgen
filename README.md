@@ -278,7 +278,7 @@ buildgen list
 | `py/cython` | Extension using Cython |
 | `py/cext` | C extension (Python.h) |
 
-**Pure Python Recipes** (hatchling, no native build):
+**Pure Python Recipes** (uv_build, no native build):
 
 | Recipe | Description |
 |--------|-------------|
@@ -333,7 +333,7 @@ buildgen new mypkg -r py/nodeps
 
 ```text
 mypkg/
-  pyproject.toml      # hatchling backend, dependencies = []
+  pyproject.toml      # uv_build backend, dependencies = []
   Makefile            # Convenience wrapper
   src/mypkg/
     __init__.py       # Python package
@@ -344,7 +344,7 @@ mypkg/
   .github/workflows/  # ci.yml + publish.yml
 ```
 
-Differences from the extension recipes: hatchling replaces scikit-build-core,
+Differences from the extension recipes: uv_build replaces scikit-build-core,
 there is no `CMakeLists.txt`, the CI build leg runs on a single runner (one
 `py3-none-any` wheel serves every platform), and publishing uses a plain
 sdist/wheel workflow rather than cibuildwheel. Development tooling (pytest,

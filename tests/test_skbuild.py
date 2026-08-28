@@ -4,6 +4,7 @@ import argparse
 
 import pytest
 
+from buildgen.cli import cmd_new, cmd_render
 from buildgen.skbuild.generator import (
     SkbuildProjectGenerator,
     get_skbuild_types,
@@ -15,7 +16,6 @@ from buildgen.skbuild.templates import (
     TEMPLATE_FILES,
     get_type_description,
 )
-from buildgen.cli import cmd_new, cmd_render
 
 
 class TestSkbuildTypes:
@@ -564,8 +564,8 @@ class TestNodepsRecipe:
 
         pyproject = (project_dir / "pyproject.toml").read_text()
         assert "dependencies = []" in pyproject
-        assert 'build-backend = "hatchling.build"' in pyproject
-        assert "[tool.hatch.build.targets.wheel]" in pyproject
+        assert 'build-backend = "uv_build"' in pyproject
+        assert "[tool.uv.build-backend]" in pyproject
         assert "scikit_build_core" not in pyproject
         assert "[tool.scikit-build]" not in pyproject
 

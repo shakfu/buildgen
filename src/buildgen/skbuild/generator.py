@@ -6,10 +6,11 @@ reuse the same machinery with a file map that has no CMakeLists.txt.
 """
 
 from pathlib import Path
-from typing import Optional, Any, Dict
+from typing import Any
 
 from mako.lookup import TemplateLookup
 from mako.template import Template
+
 from buildgen.common.config import UserConfig
 from buildgen.common.deps import get_default_versions, resolve_latest_versions
 from buildgen.skbuild.templates import (
@@ -66,11 +67,11 @@ class SkbuildProjectGenerator:
         self,
         name: str,
         template_type: str,
-        output_dir: Optional[Path] = None,
+        output_dir: Path | None = None,
         env_tool: str = "uv",
-        project_dir: Optional[Path] = None,
-        context: Optional[dict[str, Any]] = None,
-        user_config: Optional[UserConfig] = None,
+        project_dir: Path | None = None,
+        context: dict[str, Any] | None = None,
+        user_config: UserConfig | None = None,
         update_deps: bool = True,
     ):
         """Initialize the generator.
@@ -107,12 +108,12 @@ class SkbuildProjectGenerator:
         self.project_dir = project_dir
 
         # Build context: user config as base, explicit context overrides
-        base_ctx: Dict[str, Any] = {"user": {}, "defaults": {}}
+        base_ctx: dict[str, Any] = {"user": {}, "defaults": {}}
         if user_config:
             base_ctx.update(user_config.to_template_context())
         if context:
             base_ctx.update(context)
-        self.context: Dict[str, Any] = base_ctx
+        self.context: dict[str, Any] = base_ctx
         if "options" not in self.context:
             self.context["options"] = {}
 
@@ -173,7 +174,7 @@ class SkbuildProjectGenerator:
 
         for output_path_template, (
             template_path,
-            source,
+            _source,
         ) in self.resolved_templates.items():
             file_path = self._render_path(output_path_template)
             content = self._render_template(template_path)

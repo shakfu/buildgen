@@ -1,15 +1,14 @@
 """Tests for dependency version resolution."""
 
 import json
-from unittest.mock import patch, MagicMock
-
+from unittest.mock import MagicMock, patch
 
 from buildgen.common.deps import (
-    DEFAULT_VERSIONS,
     BUILD_SYSTEM_PACKAGES,
+    DEFAULT_VERSIONS,
+    _fetch_latest_version,
     get_default_versions,
     resolve_latest_versions,
-    _fetch_latest_version,
 )
 
 
@@ -25,7 +24,7 @@ class TestDefaultVersions:
             "twine",
             "pybind11-stubgen",
             "scikit-build-core",
-            "hatchling",
+            "uv-build",
         }
         assert expected == set(DEFAULT_VERSIONS.keys())
 
@@ -161,7 +160,7 @@ class TestGeneratorIntegration:
         """With update_deps=True, generator should use resolved versions."""
         from buildgen.skbuild.generator import SkbuildProjectGenerator
 
-        fake_versions = {pkg: "77.0.0" for pkg in DEFAULT_VERSIONS}
+        fake_versions = dict.fromkeys(DEFAULT_VERSIONS, "77.0.0")
         with patch(
             "buildgen.skbuild.generator.resolve_latest_versions",
             return_value=fake_versions,
@@ -226,7 +225,7 @@ class TestGeneratorIntegration:
         from buildgen.skbuild.generator import SkbuildProjectGenerator
 
         cfg = UserConfig(deps={"ruff": "0.10.0"})
-        fake_versions = {pkg: "77.0.0" for pkg in DEFAULT_VERSIONS}
+        fake_versions = dict.fromkeys(DEFAULT_VERSIONS, "77.0.0")
         with patch(
             "buildgen.skbuild.generator.resolve_latest_versions",
             return_value=fake_versions,

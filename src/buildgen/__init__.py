@@ -10,15 +10,15 @@ For additional components, import from submodules:
     from buildgen.common.project import TargetConfig, DependencyConfig
 """
 
-__version__ = "0.2.0"
+__version__ = "0.3.0"
 
 # Core API - minimal exports for early development flexibility
+from buildgen.cmake.generator import CMakeListsGenerator
 from buildgen.common.project import ProjectConfig
 from buildgen.makefile.generator import MakefileGenerator
-from buildgen.cmake.generator import CMakeListsGenerator
 
 __all__ = [
-    "ProjectConfig",
-    "MakefileGenerator",
     "CMakeListsGenerator",
+    "MakefileGenerator",
+    "ProjectConfig",
 ]

@@ -4,6 +4,38 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.3.0]
+
+### Added
+
+- **`common/versions.py`** - one registry for every pinned version: PyPI floors, GitHub Action refs, CMake ranges, language standards, Python versions, FetchContent tags. Templates read it instead of holding literals, so a bump touches one file. `deps.DEFAULT_VERSIONS` and `BUILD_SYSTEM_PACKAGES` alias into it. Resolution order is unchanged: a `[deps]` pin beats a PyPI lookup, which beats the registry floor.
+
+- **Drift guards** in `tests/test_versions.py`. They fail when a registry value appears literally in a template, and when buildgen's own dev floors diverge from the registry.
+
+### Changed
+
+- **buildgen's build backend is `uv_build` again**, pinned `uv_build>=0.12.6,<0.13`. The 0.2.0 note below is wrong on the reason for leaving. uv-build is a separate distribution whose documented pin is a next-minor cap you bump, not a lock to the installed uv. Wheel contents are unchanged.
+
+- **`py/nodeps` generates a `uv_build` project** instead of hatchling. The recipe exists to have no dependencies, so requiring a backend package worked against it.
+
+- **Dependency floors raised** to current releases: mypy 2.3.1, pytest 9.1.1, pytest-cov 7.1.0, ruff 0.16.5, pybind11-stubgen 2.5.5, scikit-build-core 1.0.3. buildgen's own dev group moves with them.
+
+- **`scripts/update_workflow_actions.py` rewrites the `ACTIONS` table** rather than the templates, which no longer hold action refs.
+
+- **The ruff rule set is pinned** in `[tool.ruff.lint]`. The project had no ruff config, so its lint gate was whatever the installed ruff defaulted to. An upgrade can no longer move it.
+
+### Fixed
+
+- **`make typecheck` failed on every generated native project.** mypy rejects the compiled `_core` module, which ships no stubs. The generated `pyproject.toml` now overrides that one module and leaves the rest under `strict`.
+
+- **`py/pybind11-flex` could not build with its default options.** A `<%text>` block stopped `${name}` from interpolating, so the CMake test target became `_catch2`. The existing tests missed this because they set `test_framework=none`.
+
+- **196 ruff findings** introduced by 0.16.5, which widened its default rule set. Most were `Optional[X]` to `X | None` and import ordering. `os.path` calls moved to `pathlib` throughout.
+
+### Removed
+
+- **`hatchling` is no longer a tracked dependency floor.** Nothing generates a hatchling project. A `hatchling` pin under `[deps]` is now inert; use `uv-build` instead.
+
 ## [0.2.0]
 
 ### Added

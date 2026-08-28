@@ -1,22 +1,23 @@
 """Tests for CMake generation and building."""
 
-import pytest
+import contextlib
 import tempfile
-import os
 from pathlib import Path
 
-from buildgen.cmake.variables import (
-    CMakeVar,
-    CMakeCacheVar,
-    CMakeOption,
-    CMakeEnvVar,
-    cmake_var,
-    cmake_env_var,
-    cmake_bool,
-)
-from buildgen.cmake.generator import CMakeListsGenerator
+import pytest
+
 from buildgen.cmake.builder import CMakeBuilder
 from buildgen.cmake.functions import Cm
+from buildgen.cmake.generator import CMakeListsGenerator
+from buildgen.cmake.variables import (
+    CMakeCacheVar,
+    CMakeEnvVar,
+    CMakeOption,
+    CMakeVar,
+    cmake_bool,
+    cmake_env_var,
+    cmake_var,
+)
 
 
 class TestCMakeVariables:
@@ -44,7 +45,7 @@ class TestCMakeVariables:
 
     def test_cmake_var_empty_raises(self):
         """Test that empty CMakeVar raises error."""
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match="at least one value"):
             CMakeVar("MY_VAR")
 
     def test_cmake_cache_var(self):
@@ -68,7 +69,7 @@ class TestCMakeVariables:
 
     def test_cmake_cache_var_invalid_type(self):
         """Test CMakeCacheVar with invalid type."""
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match="var_type must be one of"):
             CMakeCacheVar("MY_VAR", "value", "INVALID_TYPE")
 
     def test_cmake_option(self):
@@ -248,10 +249,8 @@ class TestCMakeListsGenerator:
         with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as f:
             temp_path = f.name
         yield temp_path
-        try:
-            os.unlink(temp_path)
-        except FileNotFoundError:
-            pass
+        with contextlib.suppress(FileNotFoundError):
+            Path(temp_path).unlink()
 
     def test_generator_creation(self, temp_cmake):
         """Test CMakeListsGenerator creation."""
@@ -311,7 +310,7 @@ class TestCMakeListsGenerator:
         gen.add_executable("myapp", ["main.cpp"])
         gen.generate()
 
-        with open(temp_cmake, "r") as f:
+        with Path(temp_cmake).open() as f:
             content = f.read()
 
         assert "cmake_minimum_required" in content
@@ -327,7 +326,7 @@ class TestCMakeListsGenerator:
         gen.add_executable("myapp", ["main.cpp"], link_libraries=["Threads::Threads"])
         gen.generate()
 
-        with open(temp_cmake, "r") as f:
+        with Path(temp_cmake).open() as f:
             content = f.read()
 
         assert "find_package(Threads" in content
@@ -341,7 +340,7 @@ class TestCMakeListsGenerator:
         gen.add_executable("myapp", ["main.cpp"], link_libraries=["mylib"])
         gen.generate()
 
-        with open(temp_cmake, "r") as f:
+        with Path(temp_cmake).open() as f:
             content = f.read()
 
         assert "add_library(mylib STATIC lib.cpp)" in content
@@ -354,7 +353,7 @@ class TestCMakeBuilder:
     def test_builder_creation(self):
         """Test CMakeBuilder creation."""
         builder = CMakeBuilder(source_dir=".", build_dir="build")
-        assert builder.source_dir == Path(".")
+        assert builder.source_dir == Path()
         assert builder.build_dir == Path("build")
 
     def test_set_generator(self):
@@ -450,10 +449,8 @@ class TestCMakeIntegration:
         with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as f:
             temp_path = f.name
         yield temp_path
-        try:
-            os.unlink(temp_path)
-        except FileNotFoundError:
-            pass
+        with contextlib.suppress(FileNotFoundError):
+            Path(temp_path).unlink()
 
     def test_full_project_generation(self, temp_cmake):
         """Test generating a complete project."""
@@ -497,7 +494,7 @@ class TestCMakeIntegration:
 
         gen.generate()
 
-        with open(temp_cmake, "r") as f:
+        with Path(temp_cmake).open() as f:
             content = f.read()
 
         # Verify all sections present

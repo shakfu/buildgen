@@ -6,8 +6,9 @@ Recipes use a `category/variant` naming convention:
 - py/pybind11, py/nanobind, py/cython, py/cext, py/nodeps
 """
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Any, Callable, Optional
+from typing import Any
 
 
 @dataclass
@@ -20,14 +21,14 @@ class Recipe:
     variant: str  # e.g., "executable", "pybind11"
     build_system: str  # "cmake", "skbuild", or "python" (pure Python, no native build)
     language: str  # "c", "cpp", "cython", "python"
-    framework: Optional[str] = None  # "pybind11", "nanobind", etc.
+    framework: str | None = None  # "pybind11", "nanobind", etc.
     configurable: bool = False
-    config_template: Optional[str] = None
+    config_template: str | None = None
     default_options: dict[str, Any] = field(default_factory=dict)
     # Key into buildgen.skbuild.templates.TEMPLATE_FILES. Defaults to the
     # legacy "skbuild-{framework}" name; recipes with no native framework
     # (e.g. py/nodeps) set it to their recipe path instead.
-    template_key: Optional[str] = None
+    template_key: str | None = None
 
     @property
     def template_type(self) -> str:

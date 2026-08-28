@@ -1,4 +1,7 @@
 <%page args="name, options={}, defaults={}" />\
+<%!
+from buildgen.common import versions as V
+%>\
 <%
 raw_options = locals().get("options")
 if not isinstance(raw_options, dict):
@@ -7,8 +10,8 @@ opts = raw_options
 _defaults = defaults if isinstance(defaults, dict) else {}
 # The floor matches pyproject's requires-python (defaults.python_version); CI
 # must not test below it. The newest leg is a recent release, clamped to >= floor.
-min_python = opts.get("min_python", _defaults.get("python_version", "3.10"))
-python_version = opts.get("python_version", "3.13")
+min_python = opts.get("min_python", _defaults.get("python_version", str(V.PYTHON["floor"])))
+python_version = opts.get("python_version", str(V.PYTHON["ci_latest"]))
 _vt = lambda v: tuple(int(p) for p in v.split("."))
 if _vt(python_version) < _vt(min_python):
     python_version = min_python
@@ -40,10 +43,10 @@ jobs:
     name: QA (lint, typecheck, test)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: ${V.action('actions/checkout')}
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v10.0.1
+        uses: ${V.action('astral-sh/setup-uv')}
         with:
           enable-cache: true
 
@@ -66,7 +69,7 @@ jobs:
         run: uv run pytest tests/ -v --cov=src/${name} --cov-report=xml
 
       - name: Upload coverage
-        uses: codecov/codecov-action@v7
+        uses: ${V.action('codecov/codecov-action')}
         with:
           files: coverage.xml
           fail_ci_if_error: false
@@ -83,10 +86,10 @@ jobs:
         python-version: [${", ".join('"%s"' % v for v in _matrix_versions)}]
 
     steps:
-      - uses: actions/checkout@v7
+      - uses: ${V.action('actions/checkout')}
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v10.0.1
+        uses: ${V.action('astral-sh/setup-uv')}
         with:
           enable-cache: true
 
@@ -103,7 +106,7 @@ jobs:
         run: uv run pytest tests/ -v
 
       - name: Upload wheel artifact
-        uses: actions/upload-artifact@v7
+        uses: ${V.action('actions/upload-artifact')}
         with:
           name: wheel-${"${{ matrix.os }}"}-py${"${{ matrix.python-version }}"}
           path: dist/*.whl
@@ -115,7 +118,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Download all artifacts
-        uses: actions/download-artifact@v8
+        uses: ${V.action('actions/download-artifact')}
         with:
           path: all-wheels
           pattern: wheel-*
@@ -125,7 +128,7 @@ jobs:
         run: ls -la all-wheels/
 
       - name: Upload combined artifacts
-        uses: actions/upload-artifact@v7
+        uses: ${V.action('actions/upload-artifact')}
         with:
           name: all-wheels
           path: all-wheels/

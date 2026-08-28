@@ -1,4 +1,7 @@
 <%page args="name, options={}, defaults={}" />\
+<%!
+from buildgen.common import versions as V
+%>\
 name: Publish
 
 on:
@@ -25,10 +28,10 @@ jobs:
     name: Build sdist and wheel
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: ${V.action('actions/checkout')}
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v10.0.1
+        uses: ${V.action('astral-sh/setup-uv')}
         with:
           enable-cache: true
 
@@ -39,7 +42,7 @@ jobs:
         run: uvx twine check dist/*
 
       - name: Upload distributions
-        uses: actions/upload-artifact@v7
+        uses: ${V.action('actions/upload-artifact')}
         with:
           name: dist
           path: dist/
@@ -57,13 +60,13 @@ jobs:
       id-token: write
     steps:
       - name: Download distributions
-        uses: actions/download-artifact@v8
+        uses: ${V.action('actions/download-artifact')}
         with:
           name: dist
           path: dist/
 
       - name: Publish to TestPyPI
-        uses: pypa/gh-action-pypi-publish@release/v1
+        uses: ${V.action('pypa/gh-action-pypi-publish')}
         with:
           repository-url: https://test.pypi.org/legacy/
           skip-existing: true
@@ -80,13 +83,13 @@ jobs:
       id-token: write
     steps:
       - name: Download distributions
-        uses: actions/download-artifact@v8
+        uses: ${V.action('actions/download-artifact')}
         with:
           name: dist
           path: dist/
 
       - name: Publish to PyPI
-        uses: pypa/gh-action-pypi-publish@release/v1
+        uses: ${V.action('pypa/gh-action-pypi-publish')}
 
   publish-manual:
     name: Manual publish to PyPI
@@ -100,10 +103,10 @@ jobs:
       id-token: write
     steps:
       - name: Download distributions
-        uses: actions/download-artifact@v8
+        uses: ${V.action('actions/download-artifact')}
         with:
           name: dist
           path: dist/
 
       - name: Publish to PyPI
-        uses: pypa/gh-action-pypi-publish@release/v1
+        uses: ${V.action('pypa/gh-action-pypi-publish')}

@@ -1,10 +1,13 @@
-cmake_minimum_required(VERSION 3.16...3.31)
+<%!
+from buildgen.common import versions as V
+%>\
+cmake_minimum_required(VERSION ${V.CMAKE["min"]}...${V.CMAKE["policy_max"]})
 project(${name} VERSION 1.0.0 LANGUAGES CXX)
 
 add_library(${name} INTERFACE)
 add_library(${name}::${name} ALIAS ${name})
 
-target_compile_features(${name} INTERFACE cxx_std_${defaults.get("cxx_standard", 17)})
+target_compile_features(${name} INTERFACE cxx_std_${defaults.get("cxx_standard", V.STANDARDS["cxx"])})
 
 target_include_directories(${name} INTERFACE
     $<BUILD_INTERFACE:${"$"}{CMAKE_CURRENT_SOURCE_DIR}/include>

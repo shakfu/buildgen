@@ -1,11 +1,10 @@
 """Makefile generator class."""
 
-import os
 import re
-from typing import Optional
+from pathlib import Path
 
-from buildgen.common.utils import UniqueList, PathLike, TestFunc, always_true
 from buildgen.common.base import BaseGenerator
+from buildgen.common.utils import PathLike, TestFunc, UniqueList, always_true
 from buildgen.makefile.variables import Var
 
 
@@ -26,7 +25,7 @@ class MakefileWriter:
 
     def close(self) -> None:
         """Write all buffered lines to the file."""
-        with open(self.path, "w", encoding="utf-8") as f:
+        with Path(self.path).open("w", encoding="utf-8") as f:
             f.write("\n".join(self.lines))
             f.write("\n")
 
@@ -39,7 +38,7 @@ class MakefileGenerator(BaseGenerator):
         self.cxx = "g++"
         # Emitted only when set: projects with no C sources should not carry a
         # CC assignment that overrides make's own default.
-        self.cc: Optional[str] = None
+        self.cc: str | None = None
         self.pattern_rules: UniqueList = UniqueList()
         self.includes: UniqueList = UniqueList()
         self.includes_optional: UniqueList = UniqueList()
@@ -48,7 +47,7 @@ class MakefileGenerator(BaseGenerator):
         self.clean: UniqueList = UniqueList()
         self.writer = MakefileWriter(path)
 
-    def write(self, text: Optional[str] = None) -> None:
+    def write(self, text: str | None = None) -> None:
         """Write a line to the Makefile."""
         if not text:
             self.writer.write("")
@@ -81,19 +80,19 @@ class MakefileGenerator(BaseGenerator):
                 # Resolved by make at build time, not by us at generation time.
                 return True
             var_value = var.value if isinstance(var, Var) else str(var)
-            return os.path.isdir(var_value)
-        return os.path.isdir(str_path)
+            return Path(var_value).is_dir()
+        return Path(str_path).is_dir()
 
     def _normalize_path(self, path: str) -> str:
         """Normalize a path."""
-        cwd = os.getcwd()
-        home = os.path.expanduser("~")
+        cwd = str(Path.cwd())
+        home = str(Path.home())
         return path.replace(cwd, "$(CURDIR)").replace(home, "$(HOME)")
 
     def _normalize_paths(self, filenames: UniqueList) -> UniqueList:
         """Replace filenames with current directory."""
-        cwd = os.getcwd()
-        home = os.path.expanduser("~")
+        cwd = str(Path.cwd())
+        home = str(Path.home())
         return UniqueList(
             [f.replace(cwd, "$(CURDIR)").replace(home, "$(HOME)") for f in filenames]
         )
@@ -102,7 +101,7 @@ class MakefileGenerator(BaseGenerator):
         self,
         attr: str,
         prefix: str = "",
-        test_func: Optional[TestFunc] = None,
+        test_func: TestFunc | None = None,
         *entries,
         **kwargs,
     ) -> None:
@@ -175,7 +174,7 @@ class MakefileGenerator(BaseGenerator):
         self._add_entry_or_variable("ldflags", "", None, *entries, **kwargs)
 
     def add_target(
-        self, name: str, recipe: Optional[str] = None, deps: Optional[list[str]] = None
+        self, name: str, recipe: str | None = None, deps: list[str] | None = None
     ):
         """Add targets to the Makefile."""
         if not recipe and not deps:
@@ -225,7 +224,7 @@ class MakefileGenerator(BaseGenerator):
         condition_type: str,
         condition: str,
         content: str,
-        else_content: Optional[str] = None,
+        else_content: str | None = None,
     ):
         """Add conditional compilation block to the Makefile.
 
@@ -251,27 +250,19 @@ class MakefileGenerator(BaseGenerator):
 
         self.conditionals.append(conditional_block)
 
-    def add_ifeq(
-        self, condition: str, content: str, else_content: Optional[str] = None
-    ):
+    def add_ifeq(self, condition: str, content: str, else_content: str | None = None):
         """Add ifeq conditional block."""
         self.add_conditional("ifeq", condition, content, else_content)
 
-    def add_ifneq(
-        self, condition: str, content: str, else_content: Optional[str] = None
-    ):
+    def add_ifneq(self, condition: str, content: str, else_content: str | None = None):
         """Add ifneq conditional block."""
         self.add_conditional("ifneq", condition, content, else_content)
 
-    def add_ifdef(
-        self, variable: str, content: str, else_content: Optional[str] = None
-    ):
+    def add_ifdef(self, variable: str, content: str, else_content: str | None = None):
         """Add ifdef conditional block."""
         self.add_conditional("ifdef", variable, content, else_content)
 
-    def add_ifndef(
-        self, variable: str, content: str, else_content: Optional[str] = None
-    ):
+    def add_ifndef(self, variable: str, content: str, else_content: str | None = None):
         """Add ifndef conditional block."""
         self.add_conditional("ifndef", variable, content, else_content)
 

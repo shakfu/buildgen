@@ -6,10 +6,8 @@ Define a project once, generate both Makefile and CMakeLists.txt.
 import json
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Optional
 
 from buildgen.common.utils import PathLike
-
 
 # Source extensions that decide which compiler drives a translation unit.
 # Anything not listed here is left to make's implicit rules.
@@ -67,13 +65,13 @@ class DependencyConfig:
     """Configuration for an external dependency."""
 
     name: str
-    version: Optional[str] = None
+    version: str | None = None
     required: bool = True
     components: list[str] = field(default_factory=list)
     # For FetchContent/git dependencies
-    git_repository: Optional[str] = None
-    git_tag: Optional[str] = None
-    url: Optional[str] = None
+    git_repository: str | None = None
+    git_tag: str | None = None
+    url: str | None = None
 
     @classmethod
     def from_dict(cls, data: dict) -> "DependencyConfig":
@@ -105,8 +103,8 @@ class ProjectConfig:
     languages: list[str] = field(default_factory=lambda: ["CXX"])
 
     # Build settings
-    cxx_standard: Optional[int] = None
-    c_standard: Optional[int] = None
+    cxx_standard: int | None = None
+    c_standard: int | None = None
 
     # Compilers (primarily for Makefile)
     cc: str = "gcc"
@@ -132,7 +130,7 @@ class ProjectConfig:
     cmake_minimum_version: str = "3.16"
 
     # Install settings
-    install_prefix: Optional[str] = None
+    install_prefix: str | None = None
 
     @classmethod
     def from_dict(cls, data: dict) -> "ProjectConfig":
@@ -169,7 +167,7 @@ class ProjectConfig:
     @classmethod
     def from_json(cls, path: PathLike) -> "ProjectConfig":
         """Load ProjectConfig from JSON file."""
-        with open(path, "r", encoding="utf-8") as f:
+        with Path(path).open(encoding="utf-8") as f:
             data = json.load(f)
         return cls.from_dict(data)
 
@@ -186,7 +184,7 @@ class ProjectConfig:
                 "pyyaml is required for YAML support. Install with: pip install pyyaml"
             ) from None
 
-        with open(path, "r", encoding="utf-8") as f:
+        with Path(path).open(encoding="utf-8") as f:
             data = yaml.safe_load(f)
         return cls.from_dict(data)
 
@@ -198,14 +196,13 @@ class ProjectConfig:
 
         if ext == ".json":
             return cls.from_json(path)
-        elif ext in (".yaml", ".yml"):
+        if ext in (".yaml", ".yml"):
             return cls.from_yaml(path)
-        else:
-            # Try JSON first, then YAML
-            try:
-                return cls.from_json(path)
-            except json.JSONDecodeError:
-                return cls.from_yaml(path)
+        # Try JSON first, then YAML
+        try:
+            return cls.from_json(path)
+        except json.JSONDecodeError:
+            return cls.from_yaml(path)
 
     def to_dict(self) -> dict:
         """Convert ProjectConfig to dictionary."""
@@ -256,7 +253,7 @@ class ProjectConfig:
 
     def to_json(self, path: PathLike, indent: int = 2) -> None:
         """Save ProjectConfig to JSON file."""
-        with open(path, "w", encoding="utf-8") as f:
+        with Path(path).open("w", encoding="utf-8") as f:
             json.dump(self.to_dict(), f, indent=indent)
 
     def to_yaml(self, path: PathLike) -> None:
@@ -271,7 +268,7 @@ class ProjectConfig:
                 "pyyaml is required for YAML support. Install with: pip install pyyaml"
             ) from None
 
-        with open(path, "w", encoding="utf-8") as f:
+        with Path(path).open("w", encoding="utf-8") as f:
             yaml.dump(self.to_dict(), f, default_flow_style=False, sort_keys=False)
 
     def _source_extensions(self) -> tuple[list[str], list[str]]:
@@ -456,7 +453,7 @@ class ProjectConfig:
                     dep.name,
                     version=dep.version,
                     required=dep.required,
-                    components=dep.components if dep.components else None,
+                    components=dep.components or None,
                 )
 
         # Targets
@@ -637,7 +634,7 @@ class ProjectConfig:
             ]
         )
 
-        with open(output_path, "w", encoding="utf-8") as f:
+        with Path(output_path).open("w", encoding="utf-8") as f:
             f.write("\n".join(lines))
 
 

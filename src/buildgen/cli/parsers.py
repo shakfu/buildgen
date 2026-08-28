@@ -2,20 +2,20 @@
 
 import argparse
 
-from buildgen.recipes import RECIPES
 from buildgen.cli.commands import (
-    cmd_new,
-    cmd_list,
-    cmd_test,
-    cmd_generate,
-    cmd_render,
-    cmd_templates_list,
-    cmd_templates_copy,
-    cmd_templates_show,
     cmd_config_init,
-    cmd_config_show,
     cmd_config_path,
+    cmd_config_show,
+    cmd_generate,
+    cmd_list,
+    cmd_new,
+    cmd_render,
+    cmd_templates_copy,
+    cmd_templates_list,
+    cmd_templates_show,
+    cmd_test,
 )
+from buildgen.recipes import RECIPES
 
 
 def add_new_subparser(subparsers: argparse._SubParsersAction) -> None:
@@ -356,8 +356,8 @@ Examples:
 def create_parser() -> argparse.ArgumentParser:
     """Create the main CLI argument parser."""
     from buildgen import __version__
-    from buildgen.makefile.cli import add_makefile_subparsers
     from buildgen.cmake.cli import add_cmake_subparsers
+    from buildgen.makefile.cli import add_makefile_subparsers
 
     parser = argparse.ArgumentParser(
         prog="buildgen",

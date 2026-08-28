@@ -8,8 +8,6 @@ Usage:
     Cm.add_executable("myapp", "main.cpp", "utils.cpp")
 """
 
-from typing import Optional, Union
-
 
 class Cm:
     """CMake command generators.
@@ -38,10 +36,10 @@ class Cm:
     @staticmethod
     def project(
         name: str,
-        version: Optional[str] = None,
-        description: Optional[str] = None,
-        homepage_url: Optional[str] = None,
-        languages: Optional[list[str]] = None,
+        version: str | None = None,
+        description: str | None = None,
+        homepage_url: str | None = None,
+        languages: list[str] | None = None,
     ) -> str:
         """project() command."""
         parts = [f"project({name}"]
@@ -81,7 +79,7 @@ class Cm:
     def add_library(
         name: str,
         *sources: str,
-        lib_type: Optional[str] = None,
+        lib_type: str | None = None,
         exclude_from_all: bool = False,
     ) -> str:
         """add_library() command.
@@ -99,11 +97,11 @@ class Cm:
     @staticmethod
     def add_custom_target(
         name: str,
-        command: Optional[str] = None,
-        depends: Optional[list[str]] = None,
+        command: str | None = None,
+        depends: list[str] | None = None,
         all_target: bool = False,
-        comment: Optional[str] = None,
-        working_directory: Optional[str] = None,
+        comment: str | None = None,
+        working_directory: str | None = None,
     ) -> str:
         """add_custom_target() command."""
         parts = [f"add_custom_target({name}"]
@@ -121,17 +119,14 @@ class Cm:
 
     @staticmethod
     def add_custom_command(
-        output: Union[str, list[str]],
+        output: str | list[str],
         command: str,
-        depends: Optional[list[str]] = None,
-        comment: Optional[str] = None,
-        working_directory: Optional[str] = None,
+        depends: list[str] | None = None,
+        comment: str | None = None,
+        working_directory: str | None = None,
     ) -> str:
         """add_custom_command() (output form)."""
-        if isinstance(output, list):
-            output_str = " ".join(output)
-        else:
-            output_str = output
+        output_str = " ".join(output) if isinstance(output, list) else output
         parts = [f"add_custom_command(OUTPUT {output_str}"]
         parts.append(f"COMMAND {command}")
         if depends:
@@ -225,9 +220,9 @@ class Cm:
     @staticmethod
     def find_package(
         package: str,
-        version: Optional[str] = None,
+        version: str | None = None,
         required: bool = True,
-        components: Optional[list[str]] = None,
+        components: list[str] | None = None,
         config: bool = False,
         quiet: bool = False,
     ) -> str:
@@ -249,8 +244,8 @@ class Cm:
     def find_library(
         var: str,
         name: str,
-        paths: Optional[list[str]] = None,
-        hints: Optional[list[str]] = None,
+        paths: list[str] | None = None,
+        hints: list[str] | None = None,
         required: bool = False,
     ) -> str:
         """find_library() command."""
@@ -267,8 +262,8 @@ class Cm:
     def find_path(
         var: str,
         name: str,
-        paths: Optional[list[str]] = None,
-        hints: Optional[list[str]] = None,
+        paths: list[str] | None = None,
+        hints: list[str] | None = None,
         required: bool = False,
     ) -> str:
         """find_path() command."""
@@ -303,10 +298,10 @@ class Cm:
     @staticmethod
     def fetchcontent_declare(
         name: str,
-        git_repository: Optional[str] = None,
-        git_tag: Optional[str] = None,
-        url: Optional[str] = None,
-        url_hash: Optional[str] = None,
+        git_repository: str | None = None,
+        git_tag: str | None = None,
+        url: str | None = None,
+        url_hash: str | None = None,
     ) -> str:
         """FetchContent_Declare() command."""
         parts = [f"FetchContent_Declare({name}"]
@@ -329,7 +324,7 @@ class Cm:
     # Control flow
 
     @staticmethod
-    def if_(condition: str, then_block: str, else_block: Optional[str] = None) -> str:
+    def if_(condition: str, then_block: str, else_block: str | None = None) -> str:
         """if/else/endif block."""
         result = f"if({condition})\n    {then_block}"
         if else_block:
@@ -367,7 +362,7 @@ class Cm:
     @staticmethod
     def add_subdirectory(
         source_dir: str,
-        binary_dir: Optional[str] = None,
+        binary_dir: str | None = None,
         exclude_from_all: bool = False,
     ) -> str:
         """add_subdirectory() command."""
@@ -412,10 +407,10 @@ class Cm:
     @staticmethod
     def install_targets(
         *targets: str,
-        destination: Optional[str] = None,
-        runtime_destination: Optional[str] = None,
-        library_destination: Optional[str] = None,
-        archive_destination: Optional[str] = None,
+        destination: str | None = None,
+        runtime_destination: str | None = None,
+        library_destination: str | None = None,
+        archive_destination: str | None = None,
     ) -> str:
         """install(TARGETS ...) command."""
         parts = [f"install(TARGETS {' '.join(targets)}"]
@@ -434,7 +429,7 @@ class Cm:
     def install_files(
         *files: str,
         destination: str,
-        permissions: Optional[list[str]] = None,
+        permissions: list[str] | None = None,
     ) -> str:
         """install(FILES ...) command."""
         parts = [f"install(FILES {' '.join(files)}"]
@@ -447,7 +442,7 @@ class Cm:
     def install_directory(
         directory: str,
         destination: str,
-        pattern: Optional[str] = None,
+        pattern: str | None = None,
     ) -> str:
         """install(DIRECTORY ...) command."""
         parts = [f"install(DIRECTORY {directory}"]

@@ -19,7 +19,7 @@ def main() -> None:
         if hasattr(args, "func"):
             try:
                 args.func(args)
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001 - CLI prints errors, not tracebacks
                 print(f"Error: {e}", file=sys.stderr)
                 sys.exit(1)
         return
@@ -31,7 +31,7 @@ def main() -> None:
         elif hasattr(args, "func"):
             try:
                 args.func(args)
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001 - CLI prints errors, not tracebacks
                 print(f"Error: {e}", file=sys.stderr)
                 sys.exit(1)
         return
@@ -43,7 +43,7 @@ def main() -> None:
         elif hasattr(args, "func"):
             try:
                 args.func(args)
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001 - CLI prints errors, not tracebacks
                 print(f"Error: {e}", file=sys.stderr)
                 sys.exit(1)
 
@@ -54,7 +54,7 @@ def main() -> None:
         elif hasattr(args, "func"):
             try:
                 args.func(args)
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001 - CLI prints errors, not tracebacks
                 print(f"Error: {e}", file=sys.stderr)
                 sys.exit(1)
 
@@ -65,7 +65,7 @@ def main() -> None:
         elif hasattr(args, "func"):
             try:
                 args.func(args)
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001 - CLI prints errors, not tracebacks
                 print(f"Error: {e}", file=sys.stderr)
                 sys.exit(1)
 

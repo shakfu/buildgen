@@ -1,10 +1,10 @@
 """Direct compilation builder for Makefile-style builds."""
 
 import os
-from typing import Optional
+from pathlib import Path
 
-from buildgen.common.utils import PathLike, TestFunc, always_true
 from buildgen.common.base import BaseBuilder
+from buildgen.common.utils import PathLike, TestFunc, always_true
 
 
 class Builder(BaseBuilder):
@@ -96,7 +96,7 @@ class Builder(BaseBuilder):
         self,
         attr: str,
         prefix: str = "",
-        test_func: Optional[TestFunc] = None,
+        test_func: TestFunc | None = None,
         *entries,
     ) -> None:
         """Add an entry to the configuration."""
@@ -174,4 +174,4 @@ class Builder(BaseBuilder):
 
     def _setup_defaults(self):
         """Setup default model configuration."""
-        self.add_include_dirs(os.getcwd())
+        self.add_include_dirs(str(Path.cwd()))

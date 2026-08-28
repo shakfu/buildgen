@@ -1,4 +1,7 @@
 <%page args="name, defaults={}, user={}, options={}, dep_versions={}" />
+<%!
+from buildgen.common import versions as V
+%>\
 <%
 raw_options = locals().get("options")
 if not isinstance(raw_options, dict):
@@ -9,10 +12,10 @@ build_examples = bool(opts.get("build_examples", False))
 build_cpp_tests = test_framework != "none"
 _defaults = defaults if isinstance(defaults, dict) else {}
 _license = _defaults.get("license", "MIT")
-_python_version = _defaults.get("python_version", "3.10")
-_dv = dep_versions if isinstance(dep_versions, dict) else {}
+_python_version = _defaults.get("python_version", str(V.PYTHON["floor"]))
+_dv = {**V.PYPI, **(dep_versions if isinstance(dep_versions, dict) else {})}
 _py_min_minor = int(_python_version.split(".")[1])
-_py_max_minor = max(14, _py_min_minor)
+_py_max_minor = max(int(V.PYTHON["max_classifier_minor"]), _py_min_minor)
 
 _author_parts = []
 if user and isinstance(user, dict):
@@ -47,16 +50,13 @@ classifiers = [
 
 [dependency-groups]
 dev = [
-    "mypy>=${_dv.get('mypy', '1.19.1')}",
-    "pybind11-stubgen>=${_dv.get('pybind11-stubgen', '0.14')}",
-    "pytest>=${_dv.get('pytest', '8.4.2')}",
-    "pytest-cov>=${_dv.get('pytest-cov', '7.0.0')}",
-    "ruff>=${_dv.get('ruff', '0.14.9')}",
-    "twine>=${_dv.get('twine', '7.0.0')}",
+% for _tool in sorted(V.DEV_TOOLS + ("pybind11-stubgen",)):
+    "${V.requirement(_tool, _dv)}",
+% endfor
 ]
 
 [build-system]
-requires = ["scikit-build-core>=${_dv.get('scikit-build-core', '0.12')}", "pybind11"]
+requires = ["${V.requirement('scikit-build-core', _dv)}", "pybind11"]
 build-backend = "scikit_build_core.build"
 
 [tool.scikit-build]
@@ -72,3 +72,11 @@ wheel.exclude = []
 BUILD_CPP_TESTS = ${"true" if build_cpp_tests else "false"}
 TEST_FRAMEWORK = "${test_framework}"
 BUILD_EMBEDDED_CLI = ${"true" if build_examples else "false"}
+
+[tool.mypy]
+strict = true
+
+[[tool.mypy.overrides]]
+# The compiled extension ships no stubs. Everything else stays checked.
+module = "${name}._core"
+ignore_missing_imports = true

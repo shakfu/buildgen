@@ -1,5 +1,6 @@
-import os
+import contextlib
 import tempfile
+from pathlib import Path
 
 import pytest
 
@@ -9,9 +10,9 @@ from buildgen.common.utils import UniqueList
 from buildgen.makefile.builder import Builder
 from buildgen.makefile.functions import (
     AUTOMATIC_VARIABLES,
+    Mk,
     auto_var,
     get_auto_var_help,
-    Mk,
 )
 from buildgen.makefile.generator import MakefileWriter
 from buildgen.makefile.variables import AVar, CVar, IVar, SVar, Var
@@ -129,10 +130,8 @@ class TestMakefileGenerator:
         with tempfile.NamedTemporaryFile(mode="w", suffix=".mk", delete=False) as f:
             temp_path = f.name
         yield temp_path
-        try:
-            os.unlink(temp_path)
-        except FileNotFoundError:
-            pass
+        with contextlib.suppress(FileNotFoundError):
+            Path(temp_path).unlink()
 
     def test_makefile_generator_creation(self, temp_makefile):
         """Test MakefileGenerator creation"""
@@ -260,8 +259,8 @@ class TestMakefileGenerator:
         generator.generate()
 
         # Verify file was created and contains expected content
-        assert os.path.exists(temp_makefile)
-        with open(temp_makefile, "r") as f:
+        assert Path(temp_makefile).exists()
+        with Path(temp_makefile).open() as f:
             content = f.read()
 
         assert "CC = gcc" in content
@@ -282,10 +281,8 @@ class TestMakefileWriter:
         with tempfile.NamedTemporaryFile(mode="w", suffix=".mk", delete=False) as f:
             temp_path = f.name
         yield temp_path
-        try:
-            os.unlink(temp_path)
-        except FileNotFoundError:
-            pass
+        with contextlib.suppress(FileNotFoundError):
+            Path(temp_path).unlink()
 
     def test_makefile_writer_creation(self, temp_makefile):
         """Test MakefileWriter creation"""
@@ -301,7 +298,7 @@ class TestMakefileWriter:
         writer.write("CFLAGS = -Wall\n")
         writer.close()
 
-        with open(temp_makefile, "r") as f:
+        with Path(temp_makefile).open() as f:
             content = f.read()
 
         assert "CC = gcc" in content
@@ -327,10 +324,8 @@ class TestIntegration:
         with tempfile.NamedTemporaryFile(mode="w", suffix=".mk", delete=False) as f:
             temp_path = f.name
         yield temp_path
-        try:
-            os.unlink(temp_path)
-        except FileNotFoundError:
-            pass
+        with contextlib.suppress(FileNotFoundError):
+            Path(temp_path).unlink()
 
     def test_builder_integration(self):
         """Test Builder with realistic C++ project"""
@@ -380,7 +375,7 @@ class TestIntegration:
         generator.generate()
 
         # Verify comprehensive content
-        with open(temp_makefile, "r") as f:
+        with Path(temp_makefile).open() as f:
             content = f.read()
 
         # Check variables
@@ -484,10 +479,8 @@ class TestIncludeDirectives:
         with tempfile.NamedTemporaryFile(mode="w", suffix=".mk", delete=False) as f:
             temp_path = f.name
         yield temp_path
-        try:
-            os.unlink(temp_path)
-        except FileNotFoundError:
-            pass
+        with contextlib.suppress(FileNotFoundError):
+            Path(temp_path).unlink()
 
     def test_add_include(self, temp_makefile):
         """Test adding include directives"""
@@ -516,7 +509,7 @@ class TestIncludeDirectives:
         generator.add_include_optional("optional.mk")
         generator.generate()
 
-        with open(temp_makefile, "r") as f:
+        with Path(temp_makefile).open() as f:
             content = f.read()
 
         assert "include config.mk" in content
@@ -533,10 +526,8 @@ class TestConditionalCompilation:
         with tempfile.NamedTemporaryFile(mode="w", suffix=".mk", delete=False) as f:
             temp_path = f.name
         yield temp_path
-        try:
-            os.unlink(temp_path)
-        except FileNotFoundError:
-            pass
+        with contextlib.suppress(FileNotFoundError):
+            Path(temp_path).unlink()
 
     def test_add_conditional_validation(self, temp_makefile):
         """Test conditional validation"""
@@ -603,7 +594,7 @@ class TestConditionalCompilation:
         generator.add_ifdef("DEBUG", "CFLAGS += -g", "CFLAGS += -O2")
         generator.generate()
 
-        with open(temp_makefile, "r") as f:
+        with Path(temp_makefile).open() as f:
             content = f.read()
 
         assert "# Conditional blocks" in content
@@ -622,10 +613,8 @@ class TestNewFeaturesIntegration:
         with tempfile.NamedTemporaryFile(mode="w", suffix=".mk", delete=False) as f:
             temp_path = f.name
         yield temp_path
-        try:
-            os.unlink(temp_path)
-        except FileNotFoundError:
-            pass
+        with contextlib.suppress(FileNotFoundError):
+            Path(temp_path).unlink()
 
     def test_comprehensive_makefile_generation(self, temp_makefile):
         """Test comprehensive Makefile with all new features"""
@@ -658,7 +647,7 @@ class TestNewFeaturesIntegration:
         generator.generate()
 
         # Verify comprehensive content
-        with open(temp_makefile, "r") as f:
+        with Path(temp_makefile).open() as f:
             content = f.read()
 
         # Check function calls
@@ -691,10 +680,8 @@ class TestCLI:
         with tempfile.NamedTemporaryFile(mode="w", suffix=".mk", delete=False) as f:
             temp_path = f.name
         yield temp_path
-        try:
-            os.unlink(temp_path)
-        except FileNotFoundError:
-            pass
+        with contextlib.suppress(FileNotFoundError):
+            Path(temp_path).unlink()
 
     def test_cli_imports(self):
         """Test that CLI-related imports work"""
@@ -711,10 +698,10 @@ class TestCLI:
         builder = Builder("testapp")
 
         # Simulate parsing comma-separated flags
-        cxxflags = "-Wall,-Wextra,-std=c++17".split(",")
+        cxxflags = ["-Wall", "-Wextra", "-std=c++17"]
         builder.add_cxxflags(*cxxflags)
 
-        ldlibs = "-lpthread,-lm".split(",")
+        ldlibs = ["-lpthread", "-lm"]
         builder.add_ldlibs(*ldlibs)
 
         # Test dry run (what CLI would do)
@@ -754,7 +741,7 @@ class TestCLI:
         generator.generate()
 
         # Verify the result
-        with open(temp_makefile, "r") as f:
+        with Path(temp_makefile).open() as f:
             content = f.read()
 
         assert "CC = gcc" in content

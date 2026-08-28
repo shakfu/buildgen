@@ -1,6 +1,6 @@
 [project]
 name = "buildgen"
-version = "0.2.0"
+version = "0.3.0"
 description = "Build system generator - Makefile, CMake, scikit-build-core and more."
 readme = "README.md"
 authors = [
@@ -52,35 +52,46 @@ testpaths = ["tests"]
 [dependency-groups]
 dev = [
     "hypothesis>=6.135.0",
-    "mypy>=1.19.1",
-    "pytest>=8.4.2",
-    "pytest-cov>=7.0.0",
-    "ruff>=0.14.9",
+    "mypy>=2.3.1",
+    "pytest>=9.1.1",
+    "pytest-cov>=7.1.0",
+    "ruff>=0.16.5",
     "twine>=7.0.0",
     "types-PyYAML>=6.0.0",
 ]
 
 [build-system]
-requires = ["hatchling>=1.27.0"]
-build-backend = "hatchling.build"
+requires = ["uv_build>=0.12.6,<0.13"]
+build-backend = "uv_build"
 
-[tool.hatch.build.targets.wheel]
-packages = ["src/buildgen"]
-
-[tool.hatch.build.targets.sdist]
-include = [
-    "src/buildgen",
-    "tests",
-    "scripts",
-    "Makefile",
-    "README.md",
-    "CHANGELOG.md",
-    "TODO.md",
-    "LICENSE",
-]
+[tool.uv.build-backend]
+module-name = "buildgen"
+module-root = "src"
+source-include = ["tests/**", "scripts/**", "Makefile", "CHANGELOG.md", "TODO.md"]
 
 [tool.mypy]
 disable_error_code = ["import-untyped"]
 ignore_missing_imports = true
 
+[tool.ruff.lint]
+# Pinned explicitly. Ruff 0.16 widened its default rule set and turned a clean
+# tree into 196 findings; selecting the set here means a ruff upgrade cannot
+# move the gate on its own.
+select = [
+    "ASYNC", "B", "BLE", "C4", "DTZ", "E", "EXE", "F", "FA", "FLY", "FURB",
+    "G", "I", "INT", "ISC", "LOG", "N", "PERF", "PGH", "PIE", "PLE", "PLW",
+    "PT", "PTH", "RET", "RUF", "SIM", "TRY", "UP", "W", "YTT",
+]
+ignore = [
+    # ruff format owns line length. E501 only reports what it declined to split.
+    "E501",
+    # A message at the raise site beats one exception class per message.
+    "TRY003",
+]
 
+[tool.ruff.lint.per-file-ignores]
+# Optional no-op hooks. Marking them abstract would force six empty overrides
+# onto every subclass.
+"src/buildgen/common/base.py" = ["B027"]
+# Method names mirror the Makefile variables they emit (TARGET, CFLAGS, LDLIBS).
+"src/buildgen/makefile/builder.py" = ["N802"]

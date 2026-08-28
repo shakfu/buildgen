@@ -1,12 +1,12 @@
 """Abstract base classes for build system generators and builders."""
 
+import contextlib
 import shutil
 import subprocess
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Optional
 
-from buildgen.common.utils import UniqueList, PathLike
+from buildgen.common.utils import PathLike, UniqueList
 
 
 class BaseGenerator(ABC):
@@ -34,43 +34,34 @@ class BaseGenerator(ABC):
     @abstractmethod
     def add_variable(self, key: str, value: str, var_type=None) -> None:
         """Add a variable to the build file."""
-        pass
 
     @abstractmethod
     def add_target(
-        self, name: str, recipe: Optional[str] = None, deps: Optional[list[str]] = None
+        self, name: str, recipe: str | None = None, deps: list[str] | None = None
     ) -> None:
         """Add a build target."""
-        pass
 
     @abstractmethod
     def generate(self) -> None:
         """Generate the build file."""
-        pass
 
     def add_include_dirs(self, *entries, **kwargs) -> None:
         """Add include directories."""
-        pass
 
     def add_cflags(self, *entries, **kwargs) -> None:
         """Add C compiler flags."""
-        pass
 
     def add_cxxflags(self, *entries, **kwargs) -> None:
         """Add C++ compiler flags."""
-        pass
 
     def add_link_dirs(self, *entries, **kwargs) -> None:
         """Add link directories."""
-        pass
 
     def add_ldlibs(self, *entries, **kwargs) -> None:
         """Add link libraries."""
-        pass
 
     def add_ldflags(self, *entries, **kwargs) -> None:
         """Add linker flags."""
-        pass
 
 
 class BaseBuilder(ABC):
@@ -99,17 +90,15 @@ class BaseBuilder(ABC):
     @abstractmethod
     def configure(self) -> None:
         """Configure the builder before building."""
-        pass
 
     @abstractmethod
     def build(self, dry_run: bool = False) -> None:
         """Build the target."""
-        pass
 
     def clean(self) -> None:
         """Clean up build artifacts."""
         for pattern in self._cleanup_patterns:
-            for path in Path(".").glob(pattern):
+            for path in Path().glob(pattern):
                 self._remove(path)
         for target in self._cleanup_targets:
             self._remove(target)
@@ -127,10 +116,8 @@ class BaseBuilder(ABC):
         if path.is_dir():
             shutil.rmtree(path, ignore_errors=False)
         else:
-            try:
+            with contextlib.suppress(FileNotFoundError):
                 path.unlink()
-            except FileNotFoundError:
-                pass
 
     # Property accessors for configuration lists
     @property

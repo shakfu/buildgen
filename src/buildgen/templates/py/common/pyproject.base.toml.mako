@@ -1,15 +1,19 @@
 <%page args="name, framework, framework_pkg, description, lang_classifier, defaults={}, user={}, options={}, dep_versions={}, native=True, keywords=None" />
+<%!
+from buildgen.common import versions as V
+%>\
 <%
 # Handle optional extra build requirements
 extra_requires = f', "{framework_pkg}"' if framework_pkg else ''
 _defaults = defaults if isinstance(defaults, dict) else {}
 _license = _defaults.get("license", "MIT")
-_python_version = _defaults.get("python_version", "3.10")
-_dv = dep_versions if isinstance(dep_versions, dict) else {}
+_python_version = _defaults.get("python_version", str(V.PYTHON["floor"]))
+# Resolved versions (PyPI lookup, user pins) layered over the central floors.
+_dv = {**V.PYPI, **(dep_versions if isinstance(dep_versions, dict) else {})}
 # Python version classifiers span the requires-python floor up to the latest known release
 _py_min_minor = int(_python_version.split(".")[1])
-_py_max_minor = max(14, _py_min_minor)
-# native=False -> pure-Python distribution: no compiler, no CMake, hatchling backend.
+_py_max_minor = max(int(V.PYTHON["max_classifier_minor"]), _py_min_minor)
+# native=False -> pure-Python distribution: no compiler, no CMake, uv_build backend.
 _keywords = keywords if keywords else ([framework, "python", "extension"] if native else ["python", "library"])
 %>
 [project]
@@ -55,16 +59,14 @@ classifiers = [
 
 [dependency-groups]
 dev = [
-    "mypy>=${_dv.get('mypy', '1.19.1')}",
-    "pytest>=${_dv.get('pytest', '8.4.2')}",
-    "pytest-cov>=${_dv.get('pytest-cov', '7.0.0')}",
-    "ruff>=${_dv.get('ruff', '0.14.9')}",
-    "twine>=${_dv.get('twine', '7.0.0')}",
+% for _tool in V.DEV_TOOLS:
+    "${V.requirement(_tool, _dv)}",
+% endfor
 ]
 
 % if native:
 [build-system]
-requires = ["scikit-build-core>=${_dv.get('scikit-build-core', '0.12')}"${extra_requires}]
+requires = ["${V.requirement('scikit-build-core', _dv)}"${extra_requires}]
 build-backend = "scikit_build_core.build"
 
 [tool.scikit-build]
@@ -76,14 +78,21 @@ cmake.source-dir = "."
 sdist.include = []
 sdist.exclude = []
 wheel.exclude = []
+
+[tool.mypy]
+strict = true
+
+[[tool.mypy.overrides]]
+# The compiled extension ships no stubs. Everything else stays checked.
+module = "${name}._core"
+ignore_missing_imports = true
 % else:
 [build-system]
-requires = ["hatchling>=${_dv.get('hatchling', '1.27.0')}"]
-build-backend = "hatchling.build"
+requires = ["${V.requirement('uv-build', _dv)}"]
+build-backend = "uv_build"
 
-[tool.hatch.build.targets.wheel]
-packages = ["src/${name}"]
-
-[tool.hatch.build.targets.sdist]
-include = ["src/${name}", "tests", "README.md", "LICENSE", "CHANGELOG.md"]
+[tool.uv.build-backend]
+module-name = "${name}"
+module-root = "src"
+source-include = ["tests/**", "CHANGELOG.md", "LICENSE"]
 % endif

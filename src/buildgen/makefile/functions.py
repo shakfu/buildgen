@@ -8,9 +8,6 @@ Usage:
     Mk.shell("pkg-config --cflags libfoo")
 """
 
-from typing import Optional
-
-
 # Makefile automatic variables reference
 AUTOMATIC_VARIABLES = {
     "$@": "The file name of the target of the rule.",
@@ -43,7 +40,7 @@ def auto_var(var: str) -> str:
     return var
 
 
-def get_auto_var_help(var: Optional[str] = None) -> str:
+def get_auto_var_help(var: str | None = None) -> str:
     """Get help text for automatic variables."""
     if var:
         if var in AUTOMATIC_VARIABLES:

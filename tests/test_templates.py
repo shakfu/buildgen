@@ -1,20 +1,21 @@
 """Tests for template resolver and override system."""
 
-import pytest
 from pathlib import Path
 
+import pytest
+
+from buildgen.skbuild.templates import (
+    LEGACY_TO_RECIPE_PATH,
+    SKBUILD_TYPES,
+    TEMPLATES_DIR,
+    resolve_template_files,
+)
 from buildgen.templates.resolver import (
     BUILTIN_TEMPLATES_DIR,
     TemplateResolver,
     copy_templates,
-    get_builtin_template_types,
     get_builtin_template_recipes,
-)
-from buildgen.skbuild.templates import (
-    SKBUILD_TYPES,
-    TEMPLATES_DIR,
-    resolve_template_files,
-    LEGACY_TO_RECIPE_PATH,
+    get_builtin_template_types,
 )
 
 
@@ -237,7 +238,7 @@ class TestResolveTemplateFiles:
         """Test resolving with venv environment tool."""
         resolved = resolve_template_files("skbuild-pybind11", env_tool="venv")
 
-        makefile_path, source = resolved["Makefile"]
+        makefile_path, _source = resolved["Makefile"]
         assert "venv" in str(makefile_path)
 
     def test_resolve_with_local_override(self, tmp_path):
@@ -250,11 +251,11 @@ class TestResolveTemplateFiles:
         resolved = resolve_template_files("skbuild-pybind11", project_dir=tmp_path)
 
         # pyproject.toml should be from local override
-        path, source = resolved["pyproject.toml"]
+        _path, source = resolved["pyproject.toml"]
         assert source == "local"
 
         # Other files should be built-in
-        makefile_path, makefile_source = resolved["Makefile"]
+        _makefile_path, makefile_source = resolved["Makefile"]
         assert makefile_source == "built-in"
 
     def test_resolve_invalid_type(self):
@@ -275,7 +276,7 @@ class TestSkbuildTypes:
 
     def test_types_have_descriptions(self):
         """Test all types have non-empty descriptions."""
-        for name, description in SKBUILD_TYPES.items():
+        for description in SKBUILD_TYPES.values():
             assert description
             assert len(description) > 10
 

@@ -192,7 +192,7 @@ class TestProjectConfig:
         with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
             config.to_json(f.name)
 
-            with open(f.name) as rf:
+            with Path(f.name).open() as rf:
                 data = json.load(rf)
 
             assert data["name"] == "testproject"
@@ -252,7 +252,7 @@ class TestProjectConfigGeneration:
         with tempfile.NamedTemporaryFile(mode="w", suffix="", delete=False) as f:
             config.generate_makefile(f.name)
 
-            with open(f.name) as rf:
+            with Path(f.name).open() as rf:
                 content = rf.read()
 
             assert "CXX" in content
@@ -279,7 +279,7 @@ class TestProjectConfigGeneration:
         with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as f:
             config.generate_cmake(f.name)
 
-            with open(f.name) as rf:
+            with Path(f.name).open() as rf:
                 content = rf.read()
 
             assert "cmake_minimum_required" in content
@@ -478,7 +478,7 @@ class TestProjectConfigYAML:
         with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             config.to_yaml(f.name)
 
-            with open(f.name) as rf:
+            with Path(f.name).open() as rf:
                 data = yaml.safe_load(rf)
 
             assert data["name"] == "testproject"

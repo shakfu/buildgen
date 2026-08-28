@@ -265,8 +265,8 @@ class TestConfigCLICommands:
     """Test buildgen config init/show/path commands."""
 
     def test_config_init_creates_file(self, tmp_path, monkeypatch):
-        from buildgen.cli.commands import cmd_config_init
         import buildgen.common.config as config_mod
+        from buildgen.cli.commands import cmd_config_init
 
         config_path = tmp_path / "config.toml"
         monkeypatch.setattr(config_mod, "DEFAULT_CONFIG_PATH", config_path)
@@ -281,8 +281,8 @@ class TestConfigCLICommands:
         assert "[deps]" in content
 
     def test_config_init_no_overwrite(self, tmp_path, monkeypatch):
-        from buildgen.cli.commands import cmd_config_init
         import buildgen.common.config as config_mod
+        from buildgen.cli.commands import cmd_config_init
 
         config_path = tmp_path / "config.toml"
         config_path.write_text("existing content")
@@ -296,8 +296,8 @@ class TestConfigCLICommands:
         assert config_path.read_text() == "existing content"
 
     def test_config_show_no_file(self, tmp_path, monkeypatch, capsys):
-        from buildgen.cli.commands import cmd_config_show
         import buildgen.common.config as config_mod
+        from buildgen.cli.commands import cmd_config_show
 
         config_path = tmp_path / "nonexistent.toml"
         monkeypatch.setattr(config_mod, "DEFAULT_CONFIG_PATH", config_path)
@@ -309,8 +309,8 @@ class TestConfigCLICommands:
         assert "No config file found" in output
 
     def test_config_show_with_file(self, tmp_path, monkeypatch, capsys):
-        from buildgen.cli.commands import cmd_config_show
         import buildgen.common.config as config_mod
+        from buildgen.cli.commands import cmd_config_show
 
         config_path = tmp_path / "config.toml"
         config_path.write_text(

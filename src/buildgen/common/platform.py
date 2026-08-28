@@ -1,9 +1,9 @@
 """Platform detection and Python system information."""
 
-import os
 import platform
 import sys
 import sysconfig
+from pathlib import Path
 
 # Platform constant
 PLATFORM = platform.system()
@@ -114,7 +114,7 @@ class PythonSystem:
     @property
     def config_h_dir(self) -> str:
         """Directory of config.h file."""
-        return os.path.dirname(sysconfig.get_config_h_filename())
+        return str(Path(sysconfig.get_config_h_filename()).parent)
 
     @property
     def base_cflags(self) -> str:

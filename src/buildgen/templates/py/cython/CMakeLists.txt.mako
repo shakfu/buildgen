@@ -1,4 +1,7 @@
-cmake_minimum_required(VERSION 3.15...3.31)
+<%!
+from buildgen.common import versions as V
+%>\
+cmake_minimum_required(VERSION ${V.CMAKE["python_ext_min"]}...${V.CMAKE["policy_max"]})
 project(${"$"}{SKBUILD_PROJECT_NAME} VERSION ${"$"}{SKBUILD_PROJECT_VERSION} LANGUAGES C)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)

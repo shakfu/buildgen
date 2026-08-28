@@ -4,11 +4,11 @@ All generated files are written to ./build/test-output/<test-name>/
 """
 
 from buildgen import (
-    MakefileGenerator,
     CMakeListsGenerator,
+    MakefileGenerator,
     ProjectConfig,
 )
-from buildgen.common.project import TargetConfig, DependencyConfig
+from buildgen.common.project import DependencyConfig, TargetConfig
 from buildgen.skbuild.generator import SkbuildProjectGenerator
 
 

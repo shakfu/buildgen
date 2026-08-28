@@ -1,16 +1,17 @@
 """Makefile generation and direct compilation support."""
 
-from buildgen.makefile.variables import Var, SVar, IVar, CVar, AVar
-from buildgen.makefile.generator import MakefileGenerator, MakefileWriter
 from buildgen.makefile.builder import Builder
 from buildgen.makefile.functions import (
     AUTOMATIC_VARIABLES,
+    Mk,
     auto_var,
     get_auto_var_help,
-    Mk,
 )
+from buildgen.makefile.generator import MakefileGenerator, MakefileWriter
+from buildgen.makefile.variables import AVar, CVar, IVar, SVar, Var
 
-__all__ = [
+# Grouped by category rather than sorted; the groups are the useful order.
+__all__ = [  # noqa: RUF022
     # Variables
     "Var",
     "SVar",

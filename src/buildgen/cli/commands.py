@@ -28,7 +28,7 @@ from buildgen.templates.resolver import (
 )
 
 
-def _recipe_context(recipe: "Recipe") -> Optional[dict[str, Any]]:
+def _recipe_context(recipe: "Recipe") -> dict[str, Any] | None:
     """Template context implied by a recipe itself.
 
     Only pure-Python recipes seed ``options`` from their defaults: for skbuild
@@ -42,9 +42,9 @@ def _recipe_context(recipe: "Recipe") -> Optional[dict[str, Any]]:
 
 def cmd_new(args: argparse.Namespace) -> None:
     """Create a new project from a recipe."""
-    from buildgen.skbuild.generator import SkbuildProjectGenerator
     from buildgen.cmake.project_generator import CMakeProjectGenerator
     from buildgen.common.config import load_user_config
+    from buildgen.skbuild.generator import SkbuildProjectGenerator
 
     name = args.name
     recipe_name = args.recipe or "cpp/executable"
@@ -118,7 +118,7 @@ def _generate_config_file(
     name: str,
     output_dir: Path,
     *,
-    options: Optional[dict[str, Any]] = None,
+    options: dict[str, Any] | None = None,
     user_config: Optional["UserConfig"] = None,
 ) -> None:
     """Render the config template for configurable recipes."""
@@ -187,8 +187,8 @@ def cmd_test(args: argparse.Namespace) -> None:
     import subprocess
     import tempfile
 
-    from buildgen.skbuild.generator import SkbuildProjectGenerator
     from buildgen.cmake.project_generator import CMakeProjectGenerator
+    from buildgen.skbuild.generator import SkbuildProjectGenerator
 
     # Handle --all flag (shortcut for --build --test)
     do_build = args.build or getattr(args, "all", False)
@@ -279,6 +279,7 @@ def cmd_test(args: argparse.Namespace) -> None:
                         capture_output=True,
                         text=True,
                         timeout=300,
+                        check=False,
                     )
                     if proc.returncode == 0:
                         result["build"] = True
@@ -293,6 +294,7 @@ def cmd_test(args: argparse.Namespace) -> None:
                         capture_output=True,
                         text=True,
                         timeout=120,
+                        check=False,
                     )
                     if proc.returncode == 0:
                         result["build"] = True
@@ -309,6 +311,7 @@ def cmd_test(args: argparse.Namespace) -> None:
                             capture_output=True,
                             text=True,
                             timeout=120,
+                            check=False,
                         )
                     else:
                         proc = subprocess.run(
@@ -317,6 +320,7 @@ def cmd_test(args: argparse.Namespace) -> None:
                             capture_output=True,
                             text=True,
                             timeout=120,
+                            check=False,
                         )
                     if proc.returncode == 0:
                         result["test"] = True
@@ -327,7 +331,7 @@ def cmd_test(args: argparse.Namespace) -> None:
 
         except subprocess.TimeoutExpired:
             result["error"] = "Timeout"
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 - one recipe must not abort the sweep
             result["error"] = str(e)[:500]
 
         results[recipe_name] = result
@@ -482,8 +486,8 @@ targets:
 
 def cmd_render(args: argparse.Namespace) -> None:
     """Render a configurable recipe config into a full project."""
-    from buildgen.skbuild.generator import SkbuildProjectGenerator, ENV_TOOLS
     from buildgen.common.config import load_user_config
+    from buildgen.skbuild.generator import ENV_TOOLS, SkbuildProjectGenerator
 
     config_path = Path(args.config)
     if not config_path.exists():
@@ -584,14 +588,19 @@ def _load_configurable_config(path: Path) -> dict[str, Any]:
         with path.open("r", encoding="utf-8") as handle:
             data = yaml.safe_load(handle)
         if not isinstance(data, dict):
-            raise ValueError("YAML config must be a mapping at the top level")
+            # ValueError keeps config errors one type for the CLI error path.
+            raise ValueError(  # noqa: TRY004
+                "YAML config must be a mapping at the top level"
+            )
         return data
 
     def _load_json() -> dict[str, Any]:
         with path.open("r", encoding="utf-8") as handle:
             data = json.load(handle)
         if not isinstance(data, dict):
-            raise ValueError("JSON config must be a mapping at the top level")
+            raise ValueError(  # noqa: TRY004
+                "JSON config must be a mapping at the top level"
+            )
         return data
 
     if ext in (".yaml", ".yml"):
@@ -602,15 +611,15 @@ def _load_configurable_config(path: Path) -> dict[str, Any]:
     # Try JSON first, then YAML for unknown extensions
     try:
         return _load_json()
-    except Exception:
+    except (json.JSONDecodeError, UnicodeDecodeError):
         return _load_yaml()
 
 
 def _prepare_recipe_options(
     recipe: Recipe,
-    config_options: Optional[dict[str, Any]],
+    config_options: dict[str, Any] | None,
     *,
-    override_env: Optional[str] = None,
+    override_env: str | None = None,
 ) -> dict[str, Any]:
     """Merge recipe default options with overrides, then add derived values."""
     options = dict(recipe.default_options)
@@ -703,8 +712,8 @@ def _write_plain_config(path: Path, data: dict[str, Any]) -> None:
 def cmd_templates_list(args: argparse.Namespace) -> None:
     """List available template types."""
     from buildgen.templates.resolver import (
-        get_builtin_template_recipes,
         TemplateResolver,
+        get_builtin_template_recipes,
     )
 
     resolver = TemplateResolver(Path.cwd())
@@ -767,9 +776,9 @@ def cmd_templates_copy(args: argparse.Namespace) -> None:
 def cmd_templates_show(args: argparse.Namespace) -> None:
     """Show template resolution details."""
     from buildgen.skbuild.templates import (
-        resolve_template_files,
         get_recipe_path,
         get_registry_key,
+        resolve_template_files,
     )
 
     template_type = args.recipe
@@ -797,7 +806,7 @@ def cmd_templates_show(args: argparse.Namespace) -> None:
 
 def cmd_config_init(args: argparse.Namespace) -> None:
     """Create a default ~/.buildgen/config.toml."""
-    from buildgen.common.config import DEFAULT_CONFIG_PATH, CONFIG_TEMPLATE
+    from buildgen.common.config import CONFIG_TEMPLATE, DEFAULT_CONFIG_PATH
 
     config_path = DEFAULT_CONFIG_PATH
     if config_path.exists():

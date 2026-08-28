@@ -1,7 +1,7 @@
 """CLI commands for CMake generation and building."""
 
-from buildgen.cmake.generator import CMakeListsGenerator
 from buildgen.cmake.builder import CMakeBuilder
+from buildgen.cmake.generator import CMakeListsGenerator
 
 
 def cmd_generate(args) -> None:

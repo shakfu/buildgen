@@ -1,4 +1,7 @@
 <%page args="name, defaults={}, options={}" />
+<%!
+from buildgen.common import versions as V
+%>\
 <%
 raw_options = locals().get("options")
 if not isinstance(raw_options, dict):
@@ -7,10 +10,10 @@ opts = raw_options
 test_framework = opts.get("test_framework", "catch2")
 build_examples = bool(opts.get("build_examples", False))
 build_cpp_tests_default = "ON" if test_framework != "none" else "OFF"
-cxx_std = defaults.get("cxx_standard", 17) if isinstance(defaults, dict) else 17
+cxx_std = defaults.get("cxx_standard", V.STANDARDS["cxx"]) if isinstance(defaults, dict) else V.STANDARDS["cxx"]
 %>
 
-cmake_minimum_required(VERSION 3.18...3.31)
+cmake_minimum_required(VERSION ${V.CMAKE["flex_min"]}...${V.CMAKE["policy_max"]})
 project(${"$"}{SKBUILD_PROJECT_NAME} VERSION ${"$"}{SKBUILD_PROJECT_VERSION} LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD ${cxx_std})
@@ -45,7 +48,7 @@ if(BUILD_CPP_TESTS)
         FetchContent_Declare(
             catch2
             GIT_REPOSITORY https://github.com/catchorg/Catch2.git
-            GIT_TAG v3.5.3
+            GIT_TAG ${V.GIT_TAGS["catch2"]}
         )
         FetchContent_MakeAvailable(catch2)
 
@@ -54,18 +57,16 @@ if(BUILD_CPP_TESTS)
         target_compile_features(${name}_catch2 PRIVATE cxx_std_${cxx_std})
 
         include(Catch)
-<%text>
         catch_discover_tests(${name}_catch2
             TEST_PREFIX "native::"
             PROPERTIES
-                ENVIRONMENT "PYTHONPATH=${CMAKE_CURRENT_SOURCE_DIR}/src:${CMAKE_CURRENT_BINARY_DIR}/src"
+                ENVIRONMENT "PYTHONPATH=${"$"}{CMAKE_CURRENT_SOURCE_DIR}/src:${"$"}{CMAKE_CURRENT_BINARY_DIR}/src"
         )
-</%text>
     elseif(TEST_FRAMEWORK STREQUAL "gtest")
         FetchContent_Declare(
             gtest
             GIT_REPOSITORY https://github.com/google/googletest.git
-            GIT_TAG v1.14.0
+            GIT_TAG ${V.GIT_TAGS["googletest"]}
         )
         set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
         FetchContent_MakeAvailable(gtest)
@@ -75,13 +76,11 @@ if(BUILD_CPP_TESTS)
         target_compile_features(${name}_gtest PRIVATE cxx_std_${cxx_std})
 
         include(GoogleTest)
-<%text>
         gtest_discover_tests(${name}_gtest
             TEST_PREFIX "native::"
             PROPERTIES
-                ENVIRONMENT "PYTHONPATH=${CMAKE_CURRENT_SOURCE_DIR}/src:${CMAKE_CURRENT_BINARY_DIR}/src"
+                ENVIRONMENT "PYTHONPATH=${"$"}{CMAKE_CURRENT_SOURCE_DIR}/src:${"$"}{CMAKE_CURRENT_BINARY_DIR}/src"
         )
-</%text>
     elseif(TEST_FRAMEWORK STREQUAL "none")
         message(WARNING "BUILD_CPP_TESTS requested but TEST_FRAMEWORK=none. Skipping native harness.")
     else()

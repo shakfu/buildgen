@@ -1,10 +1,9 @@
 """Makefile variable classes for different assignment types."""
 
 import subprocess
-from typing import Optional
 
 # Lazy-loaded make version for syntax compatibility
-_VERSION: Optional[float] = None
+_VERSION: float | None = None
 
 
 def get_make_version() -> float:
@@ -14,7 +13,7 @@ def get_make_version() -> float:
         Make version as a float (e.g., 4.4). Defaults to 4.0 if make
         is not installed or version cannot be determined.
     """
-    global _VERSION
+    global _VERSION  # noqa: PLW0603 - module-level memo of the installed make
     if _VERSION is None:
         try:
             output = subprocess.check_output(
@@ -53,8 +52,7 @@ class Var:
             values = "\n".join(lines)
             if get_make_version() > 3.81:
                 return f"define {self.key} {self.assign_op}\n{values}\nendef\n"
-            else:
-                return f"define {self.key}\n{values}\nendef\n"
+            return f"define {self.key}\n{values}\nendef\n"
         return f"{self.key} {self.assign_op} {self.value}"
 
 

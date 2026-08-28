@@ -119,8 +119,8 @@ class TestUniqueListDetailed:
         assert ul.index(3) == 2
         assert ul.index(5) == 4
 
-        with pytest.raises(ValueError):
-            ul.index(10)  # Element not in list
+        with pytest.raises(ValueError, match="not in list"):
+            ul.index(10)
 
     def test_first_last_methods(self):
         """Test first() and last() methods"""
@@ -144,9 +144,7 @@ class TestUniqueListDetailed:
     def test_iteration(self):
         """Test iteration over UniqueList"""
         ul = UniqueList([1, 2, 3, 4, 5])
-        result = []
-        for item in ul:
-            result.append(item)
+        result = list(ul)
         assert result == [1, 2, 3, 4, 5]
 
     def test_len_function(self):

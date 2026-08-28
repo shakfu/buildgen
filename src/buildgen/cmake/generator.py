@@ -1,11 +1,11 @@
 """CMakeLists.txt generator class."""
 
-from typing import Optional
+from pathlib import Path
 
-from buildgen.common.utils import UniqueList, PathLike
-from buildgen.common.base import BaseGenerator
-from buildgen.cmake.variables import CMakeVar, CMakeCacheVar, CMakeOption
 from buildgen.cmake.functions import Cm
+from buildgen.cmake.variables import CMakeCacheVar, CMakeOption, CMakeVar
+from buildgen.common.base import BaseGenerator
+from buildgen.common.utils import PathLike, UniqueList
 
 
 class CMakeWriter:
@@ -21,7 +21,7 @@ class CMakeWriter:
 
     def close(self) -> None:
         """Write buffer to file."""
-        with open(self.path, "w", encoding="utf8") as f:
+        with Path(self.path).open("w", encoding="utf8") as f:
             f.write("\n".join(self.lines))
             f.write("\n")
 
@@ -32,9 +32,9 @@ class CMakeListsGenerator(BaseGenerator):
     def __init__(self, path: PathLike = "CMakeLists.txt", strict: bool = False):
         super().__init__(path, strict)
         self.cmake_version = "3.16"
-        self.project_name: Optional[str] = None
-        self.project_version: Optional[str] = None
-        self.project_description: Optional[str] = None
+        self.project_name: str | None = None
+        self.project_version: str | None = None
+        self.project_description: str | None = None
         self.project_languages: list[str] = ["CXX"]
 
         # Target tracking
@@ -46,7 +46,7 @@ class CMakeListsGenerator(BaseGenerator):
         self.fetchcontent_deps: UniqueList = UniqueList()
 
         # Global settings
-        self.cxx_standard: Optional[int] = None
+        self.cxx_standard: int | None = None
         self.cxx_standard_required: bool = True
         self.cxx_extensions: bool = False
 
@@ -68,9 +68,9 @@ class CMakeListsGenerator(BaseGenerator):
     def set_project(
         self,
         name: str,
-        version: Optional[str] = None,
-        description: Optional[str] = None,
-        languages: Optional[list[str]] = None,
+        version: str | None = None,
+        description: str | None = None,
+        languages: list[str] | None = None,
     ) -> None:
         """Set project information."""
         self.project_name = name
@@ -117,10 +117,10 @@ class CMakeListsGenerator(BaseGenerator):
         self,
         name: str,
         sources: list[str],
-        include_dirs: Optional[list[str]] = None,
-        link_libraries: Optional[list[str]] = None,
-        compile_definitions: Optional[list[str]] = None,
-        compile_options: Optional[list[str]] = None,
+        include_dirs: list[str] | None = None,
+        link_libraries: list[str] | None = None,
+        compile_definitions: list[str] | None = None,
+        compile_options: list[str] | None = None,
     ) -> None:
         """Add an executable target."""
         self.executables[name] = {
@@ -136,10 +136,10 @@ class CMakeListsGenerator(BaseGenerator):
         name: str,
         sources: list[str],
         lib_type: str = "STATIC",
-        include_dirs: Optional[list[str]] = None,
-        link_libraries: Optional[list[str]] = None,
-        compile_definitions: Optional[list[str]] = None,
-        compile_options: Optional[list[str]] = None,
+        include_dirs: list[str] | None = None,
+        link_libraries: list[str] | None = None,
+        compile_definitions: list[str] | None = None,
+        compile_options: list[str] | None = None,
     ) -> None:
         """Add a library target."""
         self.libraries[name] = {
@@ -152,7 +152,7 @@ class CMakeListsGenerator(BaseGenerator):
         }
 
     def add_target(
-        self, name: str, recipe: Optional[str] = None, deps: Optional[list[str]] = None
+        self, name: str, recipe: str | None = None, deps: list[str] | None = None
     ) -> None:
         """Add a target (BaseGenerator interface).
 
@@ -164,9 +164,9 @@ class CMakeListsGenerator(BaseGenerator):
     def add_find_package(
         self,
         package: str,
-        version: Optional[str] = None,
+        version: str | None = None,
         required: bool = True,
-        components: Optional[list[str]] = None,
+        components: list[str] | None = None,
     ) -> None:
         """Add a find_package dependency."""
         self.find_packages.add(
@@ -181,9 +181,9 @@ class CMakeListsGenerator(BaseGenerator):
     def add_fetchcontent(
         self,
         name: str,
-        git_repository: Optional[str] = None,
-        git_tag: Optional[str] = None,
-        url: Optional[str] = None,
+        git_repository: str | None = None,
+        git_tag: str | None = None,
+        url: str | None = None,
     ) -> None:
         """Add a FetchContent dependency."""
         self.fetchcontent_deps.add(

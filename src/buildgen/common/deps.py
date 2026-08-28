@@ -5,29 +5,20 @@ with fallback to bundled defaults when offline or on error.
 """
 
 import json
-import urllib.request
 import urllib.error
+import urllib.request
 from concurrent.futures import ThreadPoolExecutor
-from typing import Optional
 
+from buildgen.common import versions
 
 # Fallback versions used when PyPI is unreachable or --no-update-deps is set.
-# Keep these reasonably current -- they're the floor, not the ceiling.
-DEFAULT_VERSIONS: dict[str, str] = {
-    "mypy": "1.19.1",
-    "pytest": "8.4.2",
-    "pytest-cov": "7.0.0",
-    "ruff": "0.14.9",
-    "twine": "7.0.0",
-    "pybind11-stubgen": "0.14",
-    "scikit-build-core": "0.12",
-    "hatchling": "1.27.0",
-}
+# The table itself lives in versions.py with every other pin buildgen writes.
+DEFAULT_VERSIONS = versions.PYPI
 
 # Packages whose version floor is a compatibility constraint, not a freshness
 # target.  resolve_latest_versions() still updates them, but callers can
 # choose to treat them differently.
-BUILD_SYSTEM_PACKAGES = frozenset({"scikit-build-core", "hatchling"})
+BUILD_SYSTEM_PACKAGES = versions.BUILD_BACKENDS
 
 _PYPI_URL = "https://pypi.org/pypi/{}/json"
 # Kept short: this runs on the generation path, the fallback is always correct,
@@ -38,7 +29,7 @@ _TIMEOUT = 2  # seconds per request
 _MAX_WORKERS = 8
 
 
-def _fetch_latest_version(package: str) -> Optional[str]:
+def _fetch_latest_version(package: str) -> str | None:
     """Query PyPI for the latest release version of *package*.
 
     Returns None on any network or parse error.
@@ -54,7 +45,7 @@ def _fetch_latest_version(package: str) -> Optional[str]:
 
 
 def resolve_latest_versions(
-    packages: Optional[list[str]] = None,
+    packages: list[str] | None = None,
 ) -> dict[str, str]:
     """Resolve the latest PyPI versions for *packages*.
 
@@ -74,12 +65,12 @@ def resolve_latest_versions(
     # Built in the caller's package order so output stays deterministic.
     return {
         pkg: found if found is not None else DEFAULT_VERSIONS.get(pkg, "0")
-        for pkg, found in zip(packages, latest)
+        for pkg, found in zip(packages, latest, strict=False)
     }
 
 
 def get_default_versions(
-    packages: Optional[list[str]] = None,
+    packages: list[str] | None = None,
 ) -> dict[str, str]:
     """Return the bundled default versions (no network)."""
     if packages is None:

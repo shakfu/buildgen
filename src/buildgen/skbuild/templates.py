@@ -7,9 +7,9 @@ Template paths use recipe naming: py/pybind11, py/cython, py/cext, py/nanobind
 """
 
 from pathlib import Path
-from typing import Optional
 
 from mako.template import Template
+
 from buildgen.templates.resolver import BUILTIN_TEMPLATES_DIR, TemplateResolver
 
 # Path to templates directory (built-in)
@@ -147,7 +147,7 @@ def get_type_description(template_type: str) -> str:
     return PY_PLAIN_TYPES.get(template_type, "Unknown template type")
 
 
-def get_registry_key(template_type: str) -> Optional[str]:
+def get_registry_key(template_type: str) -> str | None:
     """Map a legacy type name or a recipe path to its TEMPLATE_FILES key.
 
     Returns None when *template_type* names no known template set.
@@ -226,7 +226,7 @@ def get_template_files(template_type: str, env_tool: str = "uv") -> dict[str, st
 def resolve_template_files(
     template_type: str,
     env_tool: str = "uv",
-    project_dir: Optional[Path] = None,
+    project_dir: Path | None = None,
 ) -> dict[str, tuple[Path, str]]:
     """Get resolved template paths with override support.
 

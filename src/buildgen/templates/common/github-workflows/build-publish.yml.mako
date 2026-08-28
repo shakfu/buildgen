@@ -1,4 +1,7 @@
 <%page args="name, options={}, defaults={}" />\
+<%!
+from buildgen.common import versions as V
+%>\
 <%
 raw_options = locals().get("options")
 if not isinstance(raw_options, dict):
@@ -6,8 +9,8 @@ if not isinstance(raw_options, dict):
 opts = raw_options
 _defaults = defaults if isinstance(defaults, dict) else {}
 # The floor matches pyproject's requires-python (defaults.python_version).
-min_python = opts.get("min_python", _defaults.get("python_version", "3.10"))
-max_python = opts.get("max_python", "3.13")
+min_python = opts.get("min_python", _defaults.get("python_version", str(V.PYTHON["floor"])))
+max_python = opts.get("max_python", str(V.PYTHON["ci_latest"]))
 # Build CPython versions from min to max
 min_ver = int(min_python.split(".")[-1])
 max_ver = int(max_python.split(".")[-1])
@@ -49,16 +52,16 @@ jobs:
     name: Build source distribution
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: ${V.action('actions/checkout')}
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v10.0.1
+        uses: ${V.action('astral-sh/setup-uv')}
 
       - name: Build sdist
         run: uv build --sdist
 
       - name: Upload sdist
-        uses: actions/upload-artifact@v7
+        uses: ${V.action('actions/upload-artifact')}
         with:
           name: sdist
           path: dist/*.tar.gz
@@ -68,20 +71,20 @@ jobs:
     name: Build wheels (Linux)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: ${V.action('actions/checkout')}
 
       - name: Set up QEMU
-        uses: docker/setup-qemu-action@v4
+        uses: ${V.action('docker/setup-qemu-action')}
         with:
           platforms: arm64
 
       - name: Build wheels
-        uses: pypa/cibuildwheel@v4.2
+        uses: ${V.action('pypa/cibuildwheel')}
         env:
           CIBW_ARCHS_LINUX: x86_64 aarch64
 
       - name: Upload wheels
-        uses: actions/upload-artifact@v7
+        uses: ${V.action('actions/upload-artifact')}
         with:
           name: wheels-linux
           path: wheelhouse/*.whl
@@ -91,15 +94,15 @@ jobs:
     name: Build wheels (macOS)
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: ${V.action('actions/checkout')}
 
       - name: Build wheels
-        uses: pypa/cibuildwheel@v4.2
+        uses: ${V.action('pypa/cibuildwheel')}
         env:
           CIBW_ARCHS_MACOS: x86_64 arm64
 
       - name: Upload wheels
-        uses: actions/upload-artifact@v7
+        uses: ${V.action('actions/upload-artifact')}
         with:
           name: wheels-macos
           path: wheelhouse/*.whl
@@ -109,15 +112,15 @@ jobs:
     name: Build wheels (Windows)
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: ${V.action('actions/checkout')}
 
       - name: Build wheels
-        uses: pypa/cibuildwheel@v4.2
+        uses: ${V.action('pypa/cibuildwheel')}
         env:
           CIBW_ARCHS_WINDOWS: AMD64
 
       - name: Upload wheels
-        uses: actions/upload-artifact@v7
+        uses: ${V.action('actions/upload-artifact')}
         with:
           name: wheels-windows
           path: wheelhouse/*.whl
@@ -129,25 +132,25 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Download sdist
-        uses: actions/download-artifact@v8
+        uses: ${V.action('actions/download-artifact')}
         with:
           name: sdist
           path: dist/
 
       - name: Download Linux wheels
-        uses: actions/download-artifact@v8
+        uses: ${V.action('actions/download-artifact')}
         with:
           name: wheels-linux
           path: dist/
 
       - name: Download macOS wheels
-        uses: actions/download-artifact@v8
+        uses: ${V.action('actions/download-artifact')}
         with:
           name: wheels-macos
           path: dist/
 
       - name: Download Windows wheels
-        uses: actions/download-artifact@v8
+        uses: ${V.action('actions/download-artifact')}
         with:
           name: wheels-windows
           path: dist/
@@ -161,7 +164,7 @@ jobs:
           echo "=== Sdist count: $(ls dist/*.tar.gz 2>/dev/null | wc -l) ==="
 
       - name: Upload combined artifacts
-        uses: actions/upload-artifact@v7
+        uses: ${V.action('actions/upload-artifact')}
         with:
           name: all-dist
           path: dist/
@@ -179,13 +182,13 @@ jobs:
       id-token: write
     steps:
       - name: Download all artifacts
-        uses: actions/download-artifact@v8
+        uses: ${V.action('actions/download-artifact')}
         with:
           name: all-dist
           path: dist/
 
       - name: Publish to TestPyPI
-        uses: pypa/gh-action-pypi-publish@release/v1
+        uses: ${V.action('pypa/gh-action-pypi-publish')}
         with:
           repository-url: https://test.pypi.org/legacy/
           skip-existing: true
@@ -202,13 +205,13 @@ jobs:
       id-token: write
     steps:
       - name: Download all artifacts
-        uses: actions/download-artifact@v8
+        uses: ${V.action('actions/download-artifact')}
         with:
           name: all-dist
           path: dist/
 
       - name: Publish to PyPI
-        uses: pypa/gh-action-pypi-publish@release/v1
+        uses: ${V.action('pypa/gh-action-pypi-publish')}
 
   publish-manual:
     name: Manual Publish to PyPI
@@ -222,10 +225,10 @@ jobs:
       id-token: write
     steps:
       - name: Download all artifacts
-        uses: actions/download-artifact@v8
+        uses: ${V.action('actions/download-artifact')}
         with:
           name: all-dist
           path: dist/
 
       - name: Publish to PyPI
-        uses: pypa/gh-action-pypi-publish@release/v1
+        uses: ${V.action('pypa/gh-action-pypi-publish')}

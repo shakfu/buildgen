@@ -4,9 +4,10 @@ Generates C/C++ projects from templates in templates/cpp/* and templates/c/*.
 """
 
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, ClassVar
 
 from mako.template import Template
+
 from buildgen.common.config import UserConfig
 from buildgen.templates.resolver import TemplateResolver
 
@@ -33,7 +34,7 @@ class CMakeProjectGenerator:
     """
 
     # Map recipe paths to template file lists
-    TEMPLATE_FILES = {
+    TEMPLATE_FILES: ClassVar[dict[str, dict[str, str]]] = {
         # C++ templates
         "cpp/executable": {
             ".gitignore": "common/gitignore.cmake.mako",
@@ -144,10 +145,10 @@ class CMakeProjectGenerator:
         self,
         name: str,
         recipe: str,
-        output_dir: Optional[Path] = None,
-        project_dir: Optional[Path] = None,
-        context: Optional[dict[str, Any]] = None,
-        user_config: Optional[UserConfig] = None,
+        output_dir: Path | None = None,
+        project_dir: Path | None = None,
+        context: dict[str, Any] | None = None,
+        user_config: UserConfig | None = None,
     ):
         """Initialize the generator.
 
@@ -178,12 +179,12 @@ class CMakeProjectGenerator:
         self.resolver = TemplateResolver(project_dir)
 
         # Build context: user config as base, explicit context overrides
-        base_ctx: Dict[str, Any] = {"user": {}, "defaults": {}}
+        base_ctx: dict[str, Any] = {"user": {}, "defaults": {}}
         if user_config:
             base_ctx.update(user_config.to_template_context())
         if context:
             base_ctx.update(context)
-        self.context: Dict[str, Any] = base_ctx
+        self.context: dict[str, Any] = base_ctx
 
     def _render_path(self, path_template: str) -> Path:
         """Render a path template with the project name."""
@@ -202,8 +203,7 @@ class CMakeProjectGenerator:
         if template_path.startswith("common/"):
             filename = template_path.replace("common/", "")
             return self.resolver.resolve_common(filename)
-        else:
-            return self.resolver.resolve(self.recipe, template_path)
+        return self.resolver.resolve(self.recipe, template_path)
 
     def _render_template(self, template_path: Path) -> str:
         """Load and render a template file."""
@@ -224,7 +224,7 @@ class CMakeProjectGenerator:
 
         for output_path_template, template_path in template_files.items():
             # Resolve template (with override support)
-            resolved_path, source = self._resolve_template(template_path)
+            resolved_path, _source = self._resolve_template(template_path)
 
             # Render output path (substitute ${name})
             file_path = self._render_path(output_path_template)

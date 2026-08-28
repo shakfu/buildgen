@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import shutil
 import subprocess
+from collections.abc import Callable
 from pathlib import Path
-from typing import Callable
 
 import pytest
 
@@ -176,7 +176,7 @@ def test_py_plain_recipes_are_pure_python(build_project_dir_factory, recipe_name
 
     pyproject = (project_dir / "pyproject.toml").read_text()
     assert "dependencies = []" in pyproject
-    assert 'build-backend = "hatchling.build"' in pyproject
+    assert 'build-backend = "uv_build"' in pyproject
     assert "scikit-build" not in pyproject
     assert not (project_dir / "CMakeLists.txt").exists()
 
@@ -209,3 +209,69 @@ def test_py_plain_recipes_build(
     wheels = list((project_dir / "dist").glob("*.whl"))
     assert len(wheels) == 1, f"expected one wheel, got {wheels}"
     assert wheels[0].name.endswith("-py3-none-any.whl"), wheels[0].name
+
+
+@pytest.mark.parametrize("recipe_name", sorted(RECIPES.keys()))
+def test_no_uninterpolated_template_variable(build_project_dir_factory, recipe_name):
+    """A `${name}` left in output means a Mako block swallowed the substitution.
+
+    `<%text>` blocks protect CMake's own `${...}` from Mako, but they also
+    stop `${name}` from being substituted, producing a broken target name.
+    """
+    _, project_dir = _generate_project(recipe_name, build_project_dir_factory)
+
+    offenders = [
+        str(path.relative_to(project_dir))
+        for path in sorted(project_dir.rglob("*"))
+        if path.is_file()
+        and "${name}" in path.read_text(encoding="utf-8", errors="ignore")
+    ]
+    assert not offenders, f"un-interpolated ${{name}} in: {offenders}"
+
+
+@pytest.mark.parametrize("test_framework", ["catch2", "gtest"])
+def test_flex_native_harness_names_its_targets(
+    build_project_dir_factory, test_framework
+):
+    """The native harness must reference the project's own target, not `_catch2`.
+
+    The default option set enables this path, so it must be covered here:
+    SKBUILD_TEST_CONTEXT_OVERRIDES disables it for the other flex tests.
+    """
+    recipe_name = "py/pybind11-flex"
+    project_name = _sanitized_project_name(recipe_name)
+    output_dir = build_project_dir_factory(f"{project_name}_{test_framework}")
+    recipe = RECIPES[recipe_name]
+
+    generator = SkbuildProjectGenerator(
+        project_name,
+        recipe.template_type,
+        output_dir,
+        context={
+            "options": {**recipe.default_options, "test_framework": test_framework}
+        },
+        update_deps=False,
+    )
+    generator.generate()
+
+    cmake = (output_dir / "CMakeLists.txt").read_text()
+    discover = (
+        "catch_discover_tests" if test_framework == "catch2" else "gtest_discover_tests"
+    )
+    assert f"{discover}({project_name}_{test_framework}" in cmake
+    # CMake's own variables must survive un-substituted.
+    assert "${CMAKE_CURRENT_SOURCE_DIR}" in cmake
+
+
+@pytest.mark.parametrize("recipe_name", SKBUILD_RECIPES)
+def test_native_recipes_typecheck_the_compiled_module(
+    build_project_dir_factory, recipe_name
+):
+    """mypy rejects the stub-less compiled module unless the recipe overrides it."""
+    _, project_dir = _generate_project(recipe_name, build_project_dir_factory)
+    project_name = _sanitized_project_name(recipe_name)
+
+    pyproject = (project_dir / "pyproject.toml").read_text()
+    assert "[[tool.mypy.overrides]]" in pyproject
+    assert f'module = "{project_name}._core"' in pyproject
+    assert "ignore_missing_imports = true" in pyproject

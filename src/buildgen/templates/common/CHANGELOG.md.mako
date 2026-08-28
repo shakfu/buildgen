@@ -6,7 +6,7 @@ h2 = "##"
 h3 = "###"
 _opts = context.get("options") or {}
 _pure = bool(_opts.get("pure_python", False))
-_backend = "hatchling" if _pure else "scikit-build-core"
+_backend = "uv_build" if _pure else "scikit-build-core"
 %>\
 # Changelog
 

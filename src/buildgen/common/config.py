@@ -5,7 +5,6 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-
 DEFAULT_CONFIG_PATH = Path.home() / ".buildgen" / "config.toml"
 
 CONFIG_TEMPLATE = """\
@@ -29,7 +28,8 @@ CONFIG_TEMPLATE = """\
 # ruff = "0.14.0"
 # mypy = "1.18.0"
 # pytest = "8.4.0"
-# scikit-build-core = "0.12"
+# scikit-build-core = "1.0.3"
+# uv-build = "0.12.6"
 """
 
 
@@ -69,7 +69,7 @@ def load_user_config(path: Path | None = None) -> UserConfig:
         return UserConfig()
 
     try:
-        with open(config_path, "rb") as f:
+        with config_path.open("rb") as f:
             data = tomllib.load(f)
     except (tomllib.TOMLDecodeError, OSError):
         return UserConfig()

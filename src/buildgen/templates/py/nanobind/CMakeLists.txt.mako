@@ -1,7 +1,10 @@
-cmake_minimum_required(VERSION 3.15...3.31)
+<%!
+from buildgen.common import versions as V
+%>\
+cmake_minimum_required(VERSION ${V.CMAKE["python_ext_min"]}...${V.CMAKE["policy_max"]})
 project(${"$"}{SKBUILD_PROJECT_NAME} VERSION ${"$"}{SKBUILD_PROJECT_VERSION} LANGUAGES CXX)
 
-set(CMAKE_CXX_STANDARD ${defaults.get("cxx_standard", 17)})
+set(CMAKE_CXX_STANDARD ${defaults.get("cxx_standard", V.STANDARDS["cxx"])})
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 

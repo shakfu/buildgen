@@ -45,6 +45,7 @@ class TestCLIExecution:
             [sys.executable, "-m", "buildgen", "--help"],
             capture_output=True,
             text=True,
+            check=False,
         )
         assert result.returncode == 0
         assert "buildgen" in result.stdout
@@ -56,6 +57,7 @@ class TestCLIExecution:
             [sys.executable, "-m", "buildgen", "--version"],
             capture_output=True,
             text=True,
+            check=False,
         )
         assert result.returncode == 0
         assert "buildgen" in result.stdout
@@ -66,6 +68,7 @@ class TestCLIExecution:
             [sys.executable, "-m", "buildgen", "list"],
             capture_output=True,
             text=True,
+            check=False,
         )
         assert result.returncode == 0
         assert "Available recipes" in result.stdout
@@ -76,6 +79,7 @@ class TestCLIExecution:
             [sys.executable, "-m", "buildgen"],
             capture_output=True,
             text=True,
+            check=False,
         )
         # Exit code 1 is expected when no command given
         assert result.returncode == 1

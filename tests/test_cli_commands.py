@@ -371,7 +371,7 @@ class TestCmdTestFlagValidation:
 class TestValidationSurvivesOptimizedMode:
     """Generator input validation must not be compiled away by `python -O`."""
 
-    def test_missing_include_dir_still_rejected_under_O(self, tmp_path):
+    def test_missing_include_dir_still_rejected_under_O(self, tmp_path):  # noqa: N802
         script = tmp_path / "check.py"
         script.write_text(
             "from buildgen.makefile.generator import MakefileGenerator\n"

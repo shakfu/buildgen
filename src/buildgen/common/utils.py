@@ -1,8 +1,9 @@
 """Common utility functions and classes."""
 
 import subprocess
+from collections.abc import Callable, Iterable
 from pathlib import Path
-from typing import Any, Callable, Generic, Iterable, Optional, TypeAlias, TypeVar
+from typing import Any, Generic, TypeAlias, TypeVar
 
 # Type aliases
 PathLike: TypeAlias = Path | str
@@ -19,7 +20,7 @@ def env_var(name: str) -> str:
     return f"${{{name}}}"
 
 
-def check_output(cmd: str) -> Optional[str]:
+def check_output(cmd: str) -> str | None:
     """Run a command and return its output, or None if command not found."""
     try:
         return subprocess.check_output(cmd.split(), encoding="utf8").strip()
@@ -33,7 +34,7 @@ _T = TypeVar("_T")
 class UniqueList(list[_T], Generic[_T]):
     """A list subclass that maintains unique elements while preserving order."""
 
-    def __init__(self, iterable: Optional[Iterable[_T]] = None) -> None:
+    def __init__(self, iterable: Iterable[_T] | None = None) -> None:
         """Initialize UniqueList, ensuring all elements are unique."""
         super().__init__()
         if iterable is not None:

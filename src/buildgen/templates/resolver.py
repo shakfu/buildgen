@@ -10,7 +10,6 @@ Resolves template paths with a four-tier hierarchy:
 import os
 import shutil
 from pathlib import Path
-from typing import Optional
 
 # Built-in templates directory
 BUILTIN_TEMPLATES_DIR = Path(__file__).parent
@@ -34,7 +33,7 @@ class TemplateResolver:
         path, source = resolver.resolve("skbuild-pybind11", "pyproject.toml.mako")
     """
 
-    def __init__(self, project_dir: Optional[Path] = None):
+    def __init__(self, project_dir: Path | None = None):
         """Initialize the resolver.
 
         Args:
@@ -43,7 +42,7 @@ class TemplateResolver:
         """
         env_templates = os.environ.get("BUILDGEN_TEMPLATES")
 
-        self.search_paths: list[tuple[str, Optional[Path]]] = [
+        self.search_paths: list[tuple[str, Path | None]] = [
             ("env", Path(env_templates) if env_templates else None),
             ("local", project_dir / ".buildgen/templates" if project_dir else None),
             ("global", Path.home() / ".buildgen/templates"),
@@ -120,7 +119,7 @@ def get_builtin_template_recipes() -> list[str]:
     Returns:
         List of recipe paths (e.g., ["py/pybind11", "py/cython", ...])
     """
-    recipes = []
+    recipes: list[str] = []
     for category_dir in BUILTIN_TEMPLATES_DIR.iterdir():
         if not category_dir.is_dir():
             continue
@@ -130,9 +129,11 @@ def get_builtin_template_recipes() -> list[str]:
         ) or category_dir.name.startswith("_"):
             continue
         # Look for variant directories within category
-        for variant_dir in category_dir.iterdir():
-            if variant_dir.is_dir() and not variant_dir.name.startswith("_"):
-                recipes.append(f"{category_dir.name}/{variant_dir.name}")
+        recipes.extend(
+            f"{category_dir.name}/{variant_dir.name}"
+            for variant_dir in category_dir.iterdir()
+            if variant_dir.is_dir() and not variant_dir.name.startswith("_")
+        )
     return sorted(recipes)
 
 

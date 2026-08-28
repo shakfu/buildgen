@@ -24,7 +24,8 @@ def _load_script():
     spec = importlib.util.spec_from_file_location(
         "update_workflow_actions", SCRIPT_PATH
     )
-    assert spec is not None and spec.loader is not None
+    assert spec is not None
+    assert spec.loader is not None
     module = importlib.util.module_from_spec(spec)
     # Register before exec: @dataclass resolves annotations via sys.modules.
     sys.modules[spec.name] = module
@@ -48,7 +49,7 @@ class FakeResolver(uwa.Resolver):
 
 
 @pytest.mark.parametrize(
-    "tag, style, expected",
+    ("tag", "style", "expected"),
     [
         ("v8.2.0", "major", ["v8", "v8.2", "v8.2.0"]),
         ("v10.0.1", "major", ["v10", "v10.0", "v10.0.1"]),
@@ -125,19 +126,45 @@ def test_apply_changes_rewrites_to_the_existing_ref(tmp_path):
 
 
 def _pinned_refs() -> dict[str, set[str]]:
-    """Map every action referenced in this repo to the refs it is pinned at."""
+    """Map every action referenced in this repo to the refs it is pinned at.
+
+    Covers both pin shapes: `uses:` lines in this repo's own workflows and
+    entries in the ACTIONS registry the generated workflows render from.
+    """
     refs: dict[str, set[str]] = {}
     for pattern in uwa.SCAN_GLOBS:
         for path in REPO_ROOT.glob(pattern):
             if not path.is_file():
                 continue
-            for m in uwa.USES_RE.finditer(path.read_text(encoding="utf-8")):
+            for m in uwa.pin_re(path).finditer(path.read_text(encoding="utf-8")):
                 refs.setdefault(m.group("action"), set()).add(m.group("ref"))
     return refs
 
 
 def test_workflow_files_were_discovered():
     assert _pinned_refs(), "no action refs found; SCAN_GLOBS or layout changed"
+
+
+def test_registry_covers_every_ref_this_repo_pins():
+    """Own workflows and the registry must agree, so one bump moves both."""
+    from buildgen.common.versions import ACTIONS
+
+    missing = sorted(set(_pinned_refs()) - set(ACTIONS))
+    assert not missing, f"actions pinned outside versions.ACTIONS: {missing}"
+
+
+def test_apply_changes_rewrites_the_registry_table(tmp_path):
+    """A registry entry is rewritten in place, key and quoting intact."""
+    registry = tmp_path / "versions.py"
+    registry.write_text(
+        'ACTIONS = {\n    "actions/checkout": "v6",\n}\n', encoding="utf-8"
+    )
+    resolver = FakeResolver({"actions/checkout": ("v7.0.1", {"v7", "v7.0.1"})})
+
+    assert uwa.apply_changes([registry], resolver, "major") == 1
+    assert registry.read_text(encoding="utf-8") == (
+        'ACTIONS = {\n    "actions/checkout": "v7",\n}\n'
+    )
 
 
 def test_every_action_is_pinned_consistently():
