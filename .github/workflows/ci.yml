@@ -59,7 +59,7 @@ jobs:
     # Informational for now: this leg has never run, so it is expected to
     # surface genuine portability gaps in the generated CMake recipes. Drop
     # continue-on-error once it is green.
-    continue-on-error: true
+    continue-on-error: false
     strategy:
       fail-fast: false
       matrix:
