@@ -14,6 +14,9 @@ rewrites ``ACTIONS`` alongside this repo's own ``.github/workflows``.
 
 from __future__ import annotations
 
+LOCK_VERSION = 1
+PRESETS_SCHEMA_VERSION = 6
+
 # PyPI floors for tools and build backends installed by generated projects.
 PYPI: dict[str, str] = {
     "mypy": "2.3.1",

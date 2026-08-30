@@ -191,6 +191,10 @@ class CMakeProjectGenerator:
         rendered = Template(text=path_template).render(name=self.name)
         return self.output_dir / rendered
 
+    def output_paths(self) -> list[Path]:
+        """Paths generate() would write, without writing them."""
+        return [self._render_path(path) for path in self.TEMPLATE_FILES[self.recipe]]
+
     def _resolve_template(self, template_path: str) -> tuple[Path, str]:
         """Resolve a template path to actual file path.
 

@@ -213,6 +213,7 @@ __marimo__/
 .claude
 CLAUDE.md
 AGENTS.md
+REVIEW.md
 
 # coverage
 cov_html

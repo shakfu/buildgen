@@ -6,8 +6,37 @@ Define a project once, generate both Makefile and CMakeLists.txt.
 import json
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Any
 
+from buildgen.common import versions
 from buildgen.common.utils import PathLike
+
+# Top-level keys from_dict reads. A key outside this set is a typo or a stale
+# field, and validate() reports it rather than dropping it silently.
+CONFIG_KEYS = frozenset(
+    {
+        "name",
+        "version",
+        "description",
+        "languages",
+        "cxx_standard",
+        "c_standard",
+        "cc",
+        "cxx",
+        "include_dirs",
+        "link_dirs",
+        "compile_definitions",
+        "compile_options",
+        "link_options",
+        "targets",
+        "dependencies",
+        "variables",
+        "cmake_minimum_version",
+        "install_prefix",
+        "profiles",
+        "profile",
+    }
+)
 
 # Source extensions that decide which compiler drives a translation unit.
 # Anything not listed here is left to make's implicit rules.
@@ -72,6 +101,7 @@ class DependencyConfig:
     git_repository: str | None = None
     git_tag: str | None = None
     url: str | None = None
+    provider: str | None = None
 
     @classmethod
     def from_dict(cls, data: dict) -> "DependencyConfig":
@@ -90,6 +120,41 @@ class DependencyConfig:
             git_repository=data.get("git_repository"),
             git_tag=data.get("git_tag"),
             url=data.get("url"),
+            provider=data.get("provider"),
+        )
+
+    def resolved_provider(self) -> str:
+        """Provider to use, inferring one when the config omits it.
+
+        A dependency carrying a git repository or an archive URL is a source
+        build; anything else is looked up with find_package.
+        """
+        if self.provider:
+            return self.provider
+        return "fetchcontent" if (self.git_repository or self.url) else "system"
+
+
+@dataclass
+class ToolchainProfile:
+    """Named compiler and cross-compilation settings."""
+
+    cc: str | None = None
+    cxx: str | None = None
+    compile_options: list[str] = field(default_factory=list)
+    link_options: list[str] = field(default_factory=list)
+    cmake_variables: dict[str, str] = field(default_factory=dict)
+    toolchain_file: str | None = None
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "ToolchainProfile":
+        """Create ToolchainProfile from dictionary."""
+        return cls(
+            cc=data.get("cc"),
+            cxx=data.get("cxx"),
+            compile_options=data.get("compile_options", []),
+            link_options=data.get("link_options", []),
+            cmake_variables=data.get("cmake_variables", {}),
+            toolchain_file=data.get("toolchain_file"),
         )
 
 
@@ -131,6 +196,8 @@ class ProjectConfig:
 
     # Install settings
     install_prefix: str | None = None
+    profiles: dict[str, ToolchainProfile] = field(default_factory=dict)
+    profile: str | None = None
 
     @classmethod
     def from_dict(cls, data: dict) -> "ProjectConfig":
@@ -142,6 +209,10 @@ class ProjectConfig:
         dependencies = [
             DependencyConfig.from_dict(d) for d in data.get("dependencies", [])
         ]
+        profiles = {
+            name: ToolchainProfile.from_dict(value)
+            for name, value in data.get("profiles", {}).items()
+        }
 
         return cls(
             name=data["name"],
@@ -162,7 +233,72 @@ class ProjectConfig:
             variables=data.get("variables", {}),
             cmake_minimum_version=data.get("cmake_minimum_version", "3.16"),
             install_prefix=data.get("install_prefix"),
+            profiles=profiles,
+            profile=data.get("profile"),
         )
+
+    def _active_profile(self) -> ToolchainProfile | None:
+        """Profile named by ``profile``, or None when none is selected."""
+        if not self.profile:
+            return None
+        if self.profile not in self.profiles:
+            raise ValueError(f"unknown profile: {self.profile}")
+        return self.profiles[self.profile]
+
+    @staticmethod
+    def _profile_cache_variables(profile: ToolchainProfile | None) -> dict[str, str]:
+        """CMake cache entries implied by a toolchain profile.
+
+        Compilers and the toolchain file are written last so a profile cannot
+        contradict itself through ``cmake_variables``.
+        """
+        if profile is None:
+            return {}
+        cache = dict(profile.cmake_variables)
+        if profile.cc:
+            cache["CMAKE_C_COMPILER"] = profile.cc
+        if profile.cxx:
+            cache["CMAKE_CXX_COMPILER"] = profile.cxx
+        if profile.toolchain_file:
+            cache["CMAKE_TOOLCHAIN_FILE"] = profile.toolchain_file
+        return cache
+
+    def validate(self, source: dict[str, Any] | None = None) -> list[str]:
+        """Return structural and semantic configuration errors."""
+        errors: list[str] = []
+        if not self.name or not self.name.isidentifier():
+            errors.append("name must be a valid identifier")
+        if not self.languages:
+            errors.append("languages must not be empty")
+        valid_types = {"executable", "static", "shared", "object", "interface"}
+        names: set[str] = set()
+        for index, target in enumerate(self.targets):
+            if not target.name:
+                errors.append(f"targets[{index}].name is required")
+            if target.name in names:
+                errors.append(f"duplicate target name: {target.name}")
+            names.add(target.name)
+            if target.target_type.lower() not in valid_types:
+                errors.append(f"targets[{index}].type is invalid: {target.target_type}")
+        valid_providers = {None, "system", "cmake", "fetchcontent"}
+        for index, dep in enumerate(self.dependencies):
+            provider = dep.provider
+            if provider not in valid_providers:
+                errors.append(f"dependencies[{index}].provider is invalid: {provider}")
+            if provider == "fetchcontent" and not (dep.git_repository or dep.url):
+                errors.append(
+                    f"dependencies[{index}] fetchcontent needs git_repository or url"
+                )
+            if provider in ("system", "cmake") and (dep.git_repository or dep.url):
+                errors.append(
+                    f"dependencies[{index}] {provider} cannot use git_repository or url"
+                )
+        if self.profile and self.profile not in self.profiles:
+            errors.append(f"unknown profile: {self.profile}")
+        if source is not None:
+            unknown = sorted(set(source) - CONFIG_KEYS)
+            errors.extend(f"unknown key: {key}" for key in unknown)
+        return errors
 
     @classmethod
     def from_json(cls, path: PathLike) -> "ProjectConfig":
@@ -243,12 +379,25 @@ class ProjectConfig:
                     "git_repository": d.git_repository,
                     "git_tag": d.git_tag,
                     "url": d.url,
+                    "provider": d.provider,
                 }
                 for d in self.dependencies
             ],
             "variables": self.variables,
             "cmake_minimum_version": self.cmake_minimum_version,
             "install_prefix": self.install_prefix,
+            "profiles": {
+                name: {
+                    "cc": profile.cc,
+                    "cxx": profile.cxx,
+                    "compile_options": profile.compile_options,
+                    "link_options": profile.link_options,
+                    "cmake_variables": profile.cmake_variables,
+                    "toolchain_file": profile.toolchain_file,
+                }
+                for name, profile in self.profiles.items()
+            },
+            "profile": self.profile,
         }
 
     def to_json(self, path: PathLike, indent: int = 2) -> None:
@@ -297,13 +446,14 @@ class ProjectConfig:
         from buildgen.makefile.generator import MakefileGenerator
 
         gen = MakefileGenerator(output_path)
-        gen.cxx = self.cxx
+        active = self._active_profile()
+        gen.cxx = active.cxx if active and active.cxx else self.cxx
 
         c_exts, cxx_exts = self._source_extensions()
         declared_c = "C" in {lang.upper() for lang in self.languages}
         has_c = bool(c_exts) or declared_c
         if has_c:
-            gen.cc = self.cc
+            gen.cc = active.cc if active and active.cc else self.cc
 
         # Objects are produced by one global pattern rule, so if any target is a
         # shared library every object has to be position-independent.
@@ -324,10 +474,14 @@ class ProjectConfig:
             gen.add_include_dirs(*self.include_dirs)
         if self.link_dirs:
             gen.add_link_dirs(*self.link_dirs)
-        if self.compile_options:
-            add_compile_flags(*self.compile_options)
-        if self.link_options:
-            gen.add_ldflags(*self.link_options)
+        compile_options = self.compile_options + (
+            active.compile_options if active else []
+        )
+        link_options = self.link_options + (active.link_options if active else [])
+        if compile_options:
+            add_compile_flags(*compile_options)
+        if link_options:
+            gen.add_ldflags(*link_options)
 
         # Language standards
         if self.cxx_standard:
@@ -346,9 +500,12 @@ class ProjectConfig:
         for dep in self.dependencies:
             if dep.name.lower() == "threads":
                 gen.add_ldlibs("-lpthread")
-            elif not dep.git_repository and not dep.url:
-                # Assume system library
+            elif (provider := dep.resolved_provider()) in ("system", "cmake"):
                 gen.add_ldlibs(_link_flag(dep.name, lower=True))
+            elif provider != "fetchcontent":
+                # fetchcontent is built by CMake and has no -l flag to add here;
+                # anything else is a provider this generator cannot honour.
+                raise ValueError(f"dependency {dep.name}: unknown provider {provider}")
 
         # Targets. The "all" aggregate is declared before the targets it
         # depends on, because the generator preserves declaration order and
@@ -410,6 +567,7 @@ class ProjectConfig:
         from buildgen.cmake.generator import CMakeListsGenerator
 
         gen = CMakeListsGenerator(output_path)
+        active = self._active_profile()
 
         # Project setup
         gen.set_cmake_version(self.cmake_minimum_version)
@@ -427,34 +585,48 @@ class ProjectConfig:
         # Variables
         for key, value in self.variables.items():
             gen.add_variable(key, value)
+        for key, value in self._profile_cache_variables(active).items():
+            gen.add_cache_variable(key, value, before_project=True)
 
         # Global settings
         if self.include_dirs:
             gen.add_include_dirs(*self.include_dirs)
         if self.link_dirs:
             gen.add_link_dirs(*self.link_dirs)
-        if self.compile_options:
-            gen.add_cxxflags(*self.compile_options)
-        if self.link_options:
-            gen.add_ldflags(*self.link_options)
+        compile_options = self.compile_options + (
+            active.compile_options if active else []
+        )
+        link_options = self.link_options + (active.link_options if active else [])
+        if compile_options:
+            gen.add_cxxflags(*compile_options)
+        if link_options:
+            gen.add_ldflags(*link_options)
 
         # Dependencies
         for dep in self.dependencies:
-            if dep.git_repository:
-                gen.add_fetchcontent(
-                    dep.name,
-                    git_repository=dep.git_repository,
-                    git_tag=dep.git_tag,
-                )
-            elif dep.url:
-                gen.add_fetchcontent(dep.name, url=dep.url)
-            else:
+            provider = dep.resolved_provider()
+            if provider == "fetchcontent":
+                if dep.git_repository:
+                    gen.add_fetchcontent(
+                        dep.name,
+                        git_repository=dep.git_repository,
+                        git_tag=dep.git_tag,
+                    )
+                elif dep.url:
+                    gen.add_fetchcontent(dep.name, url=dep.url)
+                else:
+                    raise ValueError(
+                        f"dependency {dep.name}: fetchcontent needs git_repository or url"
+                    )
+            elif provider in ("system", "cmake"):
                 gen.add_find_package(
                     dep.name,
                     version=dep.version,
                     required=dep.required,
                     components=dep.components or None,
                 )
+            else:
+                raise ValueError(f"dependency {dep.name}: unknown provider {provider}")
 
         # Targets
         install_targets = []
@@ -494,6 +666,45 @@ class ProjectConfig:
             gen.add_install_target(*install_targets)
 
         gen.generate()
+
+    def generate_cmake_presets(
+        self, output_path: PathLike = "CMakePresets.json", build_dir: str = "build"
+    ) -> None:
+        """Generate standard Debug and Release CMake presets."""
+        presets: list[dict[str, Any]] = []
+        profile_cache = self._profile_cache_variables(self._active_profile())
+        for name, build_type in (("debug", "Debug"), ("release", "Release")):
+            cache: dict[str, str] = {
+                "CMAKE_BUILD_TYPE": build_type,
+                "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
+                **profile_cache,
+            }
+            preset = {
+                "name": name,
+                "displayName": f"{build_type} build",
+                "generator": "Unix Makefiles",
+                "binaryDir": f"${{sourceDir}}/{build_dir}/{name}",
+                "cacheVariables": cache,
+            }
+            presets.append(preset)
+        data = {
+            "version": versions.PRESETS_SCHEMA_VERSION,
+            "configurePresets": presets,
+            "buildPresets": [
+                {"name": name, "configurePreset": name} for name in ("debug", "release")
+            ],
+            "testPresets": [
+                {
+                    "name": name,
+                    "configurePreset": name,
+                    "output": {"outputOnFailure": True},
+                }
+                for name in ("debug", "release")
+            ],
+        }
+        Path(output_path).write_text(
+            json.dumps(data, indent=2) + "\n", encoding="utf-8"
+        )
 
     def generate_all(
         self,

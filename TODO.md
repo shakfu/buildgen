@@ -2,7 +2,13 @@
 
 ## Bootstrapping
 
-Currently require `cmake`, `make`, and `uv`. How do we deal if one of these is not available?
+Generated projects require `cmake`, `make`, `uv`, and a compiler. `buildgen
+doctor` now reports which are present, and `--recipe` exits nonzero when a tool
+that recipe needs is missing.
+
+- [ ] Run the same check before `new`, `test`, and `render`, so a missing tool
+      fails before any file is written rather than inside a generated build.
+- [ ] Print an install suggestion per tool and platform, without running it.
 
 ## Extended Recipes
 

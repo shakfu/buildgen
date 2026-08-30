@@ -6,14 +6,17 @@ from buildgen.cli.commands import (
     cmd_config_init,
     cmd_config_path,
     cmd_config_show,
+    cmd_doctor,
     cmd_generate,
     cmd_list,
+    cmd_lock,
     cmd_new,
     cmd_render,
     cmd_templates_copy,
     cmd_templates_list,
     cmd_templates_show,
     cmd_test,
+    cmd_validate,
 )
 from buildgen.recipes import RECIPES
 
@@ -63,6 +66,13 @@ Use 'buildgen list' to see available recipes.""",
         action="store_true",
         default=False,
         help="Skip resolving latest dependency versions from PyPI",
+    )
+    parser.add_argument(
+        "--offline", action="store_true", help="Do not access the network"
+    )
+    parser.add_argument("--force", action="store_true", help="Overwrite existing files")
+    parser.add_argument(
+        "--dry-run", action="store_true", help="Preview generated files"
     )
     parser.set_defaults(func=cmd_new)
 
@@ -187,6 +197,16 @@ Examples:
         action="store_true",
         help="Generate CMakeLists.txt only (with --from)",
     )
+    parser.add_argument(
+        "--dry-run", action="store_true", help="Preview generated files"
+    )
+    parser.add_argument("--force", action="store_true", help="Overwrite existing files")
+    parser.add_argument(
+        "--presets", action="store_true", help="Generate CMakePresets.json"
+    )
+    parser.add_argument(
+        "--profile", help="Toolchain profile from the config's 'profiles' block"
+    )
     parser.set_defaults(func=cmd_generate)
 
 
@@ -224,7 +244,44 @@ Examples:
         default=False,
         help="Skip resolving latest dependency versions from PyPI",
     )
+    parser.add_argument(
+        "--offline", action="store_true", help="Do not access the network"
+    )
+    parser.add_argument("--force", action="store_true", help="Overwrite existing files")
+    parser.add_argument(
+        "--dry-run", action="store_true", help="Preview generated files"
+    )
     parser.set_defaults(func=cmd_render)
+
+
+def add_doctor_subparser(subparsers: argparse._SubParsersAction) -> None:
+    """Add toolchain diagnostics command."""
+    parser = subparsers.add_parser("doctor", help="Inspect the local toolchain")
+    parser.add_argument(
+        "--json", action="store_true", help="Emit machine-readable output"
+    )
+    parser.add_argument("--recipe", help="Check tools required by a recipe")
+    parser.set_defaults(func=cmd_doctor)
+
+
+def add_validate_subparser(subparsers: argparse._SubParsersAction) -> None:
+    """Add configuration validation command."""
+    parser = subparsers.add_parser("validate", help="Validate a project configuration")
+    parser.add_argument("config", help="JSON or YAML project configuration")
+    parser.set_defaults(func=cmd_validate)
+
+
+def add_lock_subparser(subparsers: argparse._SubParsersAction) -> None:
+    """Add dependency lock command."""
+    parser = subparsers.add_parser(
+        "lock", help="Resolve and write project dependencies"
+    )
+    parser.add_argument(
+        "--recipe", default="py/pybind11", help="Recipe recorded in the lock file"
+    )
+    parser.add_argument("-o", "--output", default="buildgen.lock", help="Lock path")
+    parser.add_argument("--offline", action="store_true", help="Use bundled versions")
+    parser.set_defaults(func=cmd_lock)
 
 
 def add_templates_subparsers(subparsers: argparse._SubParsersAction) -> None:
@@ -370,6 +427,9 @@ Common Commands:
   test                  Test recipe generation and building
   generate              Generate config or build files
   render <config>       Render configurable recipe configs
+  doctor                Inspect the local toolchain
+  validate <config>     Validate a project configuration
+  lock                  Write a dependency lock file
 
 Advanced Commands:
   makefile              Direct Makefile generation
@@ -399,6 +459,9 @@ Examples:
     add_test_subparser(subparsers)
     add_generate_subparser(subparsers)
     add_render_subparser(subparsers)
+    add_doctor_subparser(subparsers)
+    add_validate_subparser(subparsers)
+    add_lock_subparser(subparsers)
 
     # Advanced commands (Tier 3)
     add_makefile_subparsers(subparsers)

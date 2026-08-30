@@ -14,8 +14,17 @@ def main() -> None:
         parser.print_help()
         sys.exit(1)
 
-    # Commands with direct func (new, list, test, generate, render)
-    if args.command in ("new", "list", "test", "generate", "render"):
+    # Commands whose parser sets func directly, with no second command tier
+    if args.command in (
+        "new",
+        "list",
+        "test",
+        "generate",
+        "render",
+        "doctor",
+        "validate",
+        "lock",
+    ):
         if hasattr(args, "func"):
             try:
                 args.func(args)

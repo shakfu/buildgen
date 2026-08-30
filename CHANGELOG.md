@@ -4,6 +4,56 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.4.0]
+
+### Added
+
+- **`doctor`, `validate`, and `lock` commands.** `doctor` reports the tools
+  generated projects need, exits nonzero for a recipe whose tools are missing,
+  and emits `--json` for CI. `validate` checks a configuration without writing
+  anything. `lock` records resolved dependency versions.
+
+- **Project-local dependency locks.** A `buildgen.lock` in the output directory
+  outranks a PyPI query with or without `--offline`: a lock is a project's
+  reproducibility record, not a fallback for a failed lookup. Packages a lock
+  predates keep their bundled default, so an older lock still generates a
+  complete project. The file carries a `lock_version`, and a version buildgen
+  does not know is an error rather than a guess at the format.
+
+- **Toolchain profiles.** A profile groups compilers, compile and link flags,
+  `cmake_variables`, and a toolchain file under a name; `profile` selects one
+  and `generate --profile` overrides it for one run. Profiles keep build configuration orthogonal to
+  project shape, so one definition targets several environments without a
+  recipe per compiler. `ToolchainProfile` is exported from the top-level
+  package.
+
+  A profile's compiler, toolchain file, and `cmake_variables` are written above
+  `project()`, which is the only place CMake reads them; set after it, they are
+  cached but never used.
+
+- **Dependency providers.** `system`, `cmake`, and `fetchcontent` state how a
+  dependency is obtained instead of leaving it inferred from the presence of
+  `git_repository` or `url`. Inference still applies when `provider` is absent,
+  so existing configurations generate as before. A `fetchcontent` dependency
+  with no source, and any unknown provider, now fail generation instead of
+  emitting a `FetchContent_Declare` with no URL or a stray `-l` flag.
+
+- **`CMakePresets.json` generation** behind `generate --presets`: Debug and
+  Release configure, build, and test presets. Each configure preset exports a
+  compilation database and carries the active profile's cache variables.
+
+### Changed
+
+- **Generation no longer replaces existing files.** `new`, `render`, and
+  `generate` abort when an output file exists; `--force` replaces, `--dry-run`
+  lists the paths and writes nothing. Re-running a recipe in a populated
+  directory previously overwrote edited files without warning.
+
+- **`generate --from` validates before writing.** Unknown top-level keys,
+  duplicate or unnamed targets, invalid target types, provider mismatches, and
+  an unknown profile name are errors. A configuration with a stray key that
+  0.3.1 loaded and silently ignored now fails.
+
 ## [0.3.1]
 
 ### Fixed

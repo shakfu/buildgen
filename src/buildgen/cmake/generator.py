@@ -54,6 +54,9 @@ class CMakeListsGenerator(BaseGenerator):
         self.custom_sections: list[str] = []
         self.install_targets: UniqueList = UniqueList()
 
+        # Cache variables written above project(); see add_cache_variable.
+        self.pre_project_vars: list[str] = []
+
         # Writer
         self.writer = CMakeWriter(path)
 
@@ -103,10 +106,25 @@ class CMakeListsGenerator(BaseGenerator):
         var_type: str = "STRING",
         docstring: str = "",
         force: bool = False,
+        before_project: bool = False,
     ) -> None:
-        """Add a cache variable."""
+        """Add a cache variable.
+
+        Args:
+            key: Variable name.
+            value: Variable value.
+            var_type: CMake cache type.
+            docstring: Cache entry documentation.
+            force: Overwrite an existing cache entry.
+            before_project: Emit above ``project()``. Compiler, toolchain, and
+                system variables are read while ``project()`` runs; CMake
+                ignores them, without error, when they are set after it.
+        """
         self.vars[key] = CMakeCacheVar(key, value, var_type, docstring, force)
-        self.var_order.append(key)
+        if before_project:
+            self.pre_project_vars.append(key)
+        else:
+            self.var_order.append(key)
 
     def add_option(self, name: str, docstring: str, default: bool = False) -> None:
         """Add an option (boolean cache variable)."""
@@ -238,6 +256,12 @@ class CMakeListsGenerator(BaseGenerator):
         """Write CMake header (minimum version, project)."""
         self.write(Cm.minimum_required(self.cmake_version))
         self.write()
+
+        if self.pre_project_vars:
+            self.write("# Toolchain")
+            for key in self.pre_project_vars:
+                self.write(str(self.vars[key]))
+            self.write()
 
         if self.project_name:
             self.write(

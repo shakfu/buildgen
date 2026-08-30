@@ -35,6 +35,11 @@ buildgen list
 - **Configurable Project Recipes**: 2-step JSON/YAML recipes which include options and which are `rendered` to generate the project infrastructure.
 - **User Configuration**: Global `~/.buildgen/config.toml` for author identity and project defaults (license, language standards, Python version, env tool)
 - **Dependency Version Resolution**: Automatically resolves latest dependency versions from PyPI at generation time, with offline fallback and per-user version pinning
+- **Reproducible Generation**: `buildgen.lock` records resolved dependency versions; `--offline` generates without network access
+- **Safe Generation**: `--dry-run` previews output paths, and existing files are never replaced without `--force`
+- **Toolchain Profiles and Presets**: Named compiler, cross-compilation, and toolchain-file settings, with opt-in Debug/Release `CMakePresets.json`
+- **Configuration Validation**: `buildgen validate` reports unknown keys, duplicate targets, and dependency errors before anything is written
+- **Toolchain Diagnostics**: `buildgen doctor` reports detected tools and versions, with `--json` for CI
 
 ## Usage
 
@@ -51,6 +56,24 @@ buildgen list
 
 # Generate build files from a config file
 buildgen generate --from project.json
+
+# Preview output paths without writing, then replace existing files
+buildgen generate --from project.json --dry-run
+buildgen generate --from project.json --force
+
+# Generate CMakePresets.json alongside CMakeLists.txt
+buildgen generate --from project.json --presets --profile clang
+
+# Check the config before generating anything
+buildgen validate project.json
+
+# Report detected tools, or the ones a recipe needs
+buildgen doctor
+buildgen doctor --json
+buildgen doctor --recipe py/pybind11
+
+# Record resolved dependency versions for reproducible generation
+buildgen lock -o buildgen.lock
 
 # Test recipe generation and building
 buildgen test --all
@@ -235,6 +258,91 @@ targets:
       - Threads::Threads
     install: true
 ```
+
+### Dependency Providers
+
+A dependency's `provider` states how it is obtained. Without it, the provider is
+inferred: a dependency carrying `git_repository` or `url` is built from source,
+anything else is looked up on the system.
+
+| Provider | CMake output | Makefile output |
+|-|-|-|
+| `system` (default) | `find_package(...)` | `-l<name>` |
+| `cmake` | `find_package(...)` | `-l<name>` |
+| `fetchcontent` | `FetchContent_Declare(...)` | no link flag |
+
+```json
+{
+    "dependencies": [
+        {"name": "OpenSSL", "provider": "system", "components": ["SSL"]},
+        {
+            "name": "fmt",
+            "provider": "fetchcontent",
+            "git_repository": "https://github.com/fmtlib/fmt.git",
+            "git_tag": "10.1.1"
+        }
+    ]
+}
+```
+
+`fetchcontent` requires `git_repository` or `url`; `system` and `cmake` reject
+both. `buildgen validate` reports either mistake.
+
+### Toolchain Profiles and CMake Presets
+
+A profile is a named set of compiler, flag, and cross-compilation settings.
+Profiles keep build configuration separate from project shape, so one project
+definition can target several environments.
+
+```json
+{
+    "name": "myproject",
+    "profile": "clang",
+    "profiles": {
+        "clang": {
+            "cc": "clang",
+            "cxx": "clang++",
+            "compile_options": ["-Wall", "-Wextra"]
+        },
+        "arm64": {
+            "toolchain_file": "cmake/arm64.cmake",
+            "cmake_variables": {"CMAKE_SYSTEM_NAME": "Generic"}
+        }
+    }
+}
+```
+
+The `profile` key selects the active profile; `buildgen generate --profile
+<name>` overrides it for one run. The active profile's compilers and flags are
+merged into the generated Makefile and CMakeLists.txt. Compiler, toolchain-file,
+and `cmake_variables` entries are written above `project()`, because CMake reads
+them while `project()` runs and ignores them afterwards.
+
+`--presets` writes a `CMakePresets.json` with Debug and Release configure,
+build, and test presets. Every preset sets `CMAKE_EXPORT_COMPILE_COMMANDS=ON`
+for language servers and IDEs, and carries the active profile's cache variables.
+
+```bash
+buildgen generate --from project.json --presets --profile clang
+cmake --preset debug && cmake --build --preset debug
+```
+
+### Validation and Safe Overwrite
+
+`buildgen validate project.json` checks a configuration without writing
+anything. It reports unknown top-level keys, missing or duplicate target names,
+invalid target types, provider mismatches, and unknown profile names. It exits
+nonzero when any check fails, so it works as a CI gate. `buildgen generate`
+runs the same checks before generating.
+
+Generation never replaces an existing file silently:
+
+- `--dry-run` lists the paths that would be written, marking each `create` or
+  `update`, and writes nothing.
+- Without `--force`, an existing output file aborts the run.
+- `--force` replaces existing files.
+
+These flags apply to `buildgen new`, `buildgen render`, and `buildgen generate`.
 
 ### Project Recipes
 
@@ -447,6 +555,35 @@ buildgen new myext -r py/pybind11 --no-update-deps
 ```
 
 This uses the bundled default versions (still overridden by any `[deps]` pins in user config).
+
+### Lock Files
+
+`buildgen lock` writes the resolved versions to a `buildgen.lock` file, so the
+same versions are used on another machine or at a later date.
+
+```bash
+buildgen lock -o myext/buildgen.lock     # resolve from PyPI
+buildgen lock --offline -o buildgen.lock # use bundled defaults, no network
+```
+
+A `buildgen.lock` in the output directory takes precedence over a PyPI query,
+with or without `--offline`. Packages the lock does not name fall back to the
+bundled defaults, so an older lock still generates a complete project. The full
+resolution order is:
+
+1. **User config `[deps]`** -- pins in `~/.buildgen/config.toml`
+2. **`buildgen.lock`** in the output directory
+3. **PyPI latest**, unless `--offline` or `--no-update-deps` is set
+4. **Bundled defaults**
+
+The file records `lock_version`, the buildgen version that wrote it, the recipe,
+and the sorted dependency versions. buildgen rejects a lock whose
+`lock_version` it does not know rather than generating from a format it cannot
+read.
+
+`buildgen doctor` reports the tools generated projects need (`cmake`, `make`,
+compilers, `python`, `uv`). With `--recipe`, it exits nonzero when a tool that
+recipe requires is missing; `--json` emits the same result for CI scripts.
 
 ## Template Customization
 

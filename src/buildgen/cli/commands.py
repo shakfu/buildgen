@@ -28,6 +28,30 @@ from buildgen.templates.resolver import (
 )
 
 
+def _write_policy(paths: list[Path], *, dry_run: bool, force: bool) -> None:
+    """Reject conflicts or report planned files before generation."""
+    conflicts = [path for path in paths if path.exists()]
+    if conflicts and not force and not dry_run:
+        listed = ", ".join(str(path) for path in conflicts[:5])
+        suffix = " ..." if len(conflicts) > 5 else ""
+        raise FileExistsError(
+            f"Refusing to overwrite existing files: {listed}{suffix}; use --force"
+        )
+    if dry_run:
+        for path in paths:
+            state = "update" if path.exists() else "create"
+            print(f"{state}: {path}")
+
+
+def _config_file_path(recipe: "Recipe", output_dir: Path) -> Path:
+    """Path _generate_config_file writes for a configurable recipe."""
+    if not recipe.config_template:
+        raise ValueError(
+            f"Recipe {recipe.name} is marked configurable but lacks config_template"
+        )
+    return output_dir / Path(recipe.config_template).with_suffix("")
+
+
 def _recipe_context(recipe: "Recipe") -> dict[str, Any] | None:
     """Template context implied by a recipe itself.
 
@@ -68,9 +92,16 @@ def cmd_new(args: argparse.Namespace) -> None:
     if env_tool is None:
         env_tool = user_config.defaults.get("env_tool", "uv")
 
+    dry_run = getattr(args, "dry_run", False)
+    force = getattr(args, "force", False)
+
     # Configurable recipes emit config first
     if recipe.configurable:
-        _generate_config_file(recipe, name, output_dir, user_config=user_config)
+        _write_policy(
+            [_config_file_path(recipe, output_dir)], dry_run=dry_run, force=force
+        )
+        if not dry_run:
+            _generate_config_file(recipe, name, output_dir, user_config=user_config)
         return
 
     update_deps = not getattr(args, "no_update_deps", False)
@@ -84,8 +115,13 @@ def cmd_new(args: argparse.Namespace) -> None:
             env_tool=env_tool,
             context=_recipe_context(recipe),
             user_config=user_config,
-            update_deps=update_deps,
+            # A preview reports paths only, so it never needs a PyPI query.
+            update_deps=update_deps and not dry_run,
+            offline=getattr(args, "offline", False),
         )
+        _write_policy(gen.output_paths(), dry_run=dry_run, force=force)
+        if dry_run:
+            return
         created = gen.generate()
         print(f"Created {recipe.name} project: {gen.output_dir}/")
         print(f"  (using {env_tool} for Makefile commands)")
@@ -102,6 +138,9 @@ def cmd_new(args: argparse.Namespace) -> None:
         cmake_gen = CMakeProjectGenerator(
             name, recipe_name, output_dir, user_config=user_config
         )
+        _write_policy(cmake_gen.output_paths(), dry_run=dry_run, force=force)
+        if dry_run:
+            return
         created = cmake_gen.generate()
         print(f"Created {recipe.name} project: {cmake_gen.output_dir}/")
         for path in created:
@@ -255,6 +294,7 @@ def cmd_test(args: argparse.Namespace) -> None:
                     env_tool="uv",
                     context=_recipe_context(recipe),
                     update_deps=False,
+                    offline=True,
                 )
                 gen.generate()
             elif recipe.build_system == "cmake":
@@ -380,9 +420,13 @@ def cmd_generate(args: argparse.Namespace) -> None:
     """Generate config file or build files."""
     from buildgen.common.project import ProjectConfig
 
+    dry_run = getattr(args, "dry_run", False)
+    force = getattr(args, "force", False)
+
     # Mode 1: Generate boilerplate config file
     if args.config:
         config_path = Path(args.config)
+        _write_policy([config_path], dry_run=dry_run, force=force)
 
         # Create a basic config template. Every key here must be one that
         # ProjectConfig.from_dict actually reads -- a key it ignores would be
@@ -451,28 +495,47 @@ targets:
             }
             content = json.dumps(config_data, indent=2)
 
+        if dry_run:
+            return
         config_path.write_text(content)
         print(f"Created config template: {config_path}")
         return
 
     # Mode 2: Generate build files from existing config
     if args.from_config:
-        config = ProjectConfig.load(args.from_config)
+        # Loaded as raw data so validation sees the keys the file actually has,
+        # not the subset from_dict kept.
+        data = _load_configurable_config(Path(args.from_config))
+        config = ProjectConfig.from_dict(data)
+        if getattr(args, "profile", None):
+            config.profile = args.profile
+        errors = config.validate(data)
+        if errors:
+            raise ValueError("Invalid project configuration: " + "; ".join(errors))
 
         # Default to --all if no output specified
         do_makefile = args.makefile or (not args.cmake)
         do_cmake = args.cmake or (not args.makefile)
 
+        do_presets = getattr(args, "presets", False) and do_cmake
+
         outputs = []
         if do_makefile:
-            makefile_path = "Makefile"
-            config.generate_makefile(makefile_path)
-            outputs.append(f"Makefile: {makefile_path}")
-
+            outputs.append(Path("Makefile"))
         if do_cmake:
-            cmake_path = "CMakeLists.txt"
-            config.generate_cmake(cmake_path)
-            outputs.append(f"CMakeLists.txt: {cmake_path}")
+            outputs.append(Path("CMakeLists.txt"))
+        if do_presets:
+            outputs.append(Path("CMakePresets.json"))
+
+        _write_policy(outputs, dry_run=dry_run, force=force)
+        if dry_run:
+            return
+        if do_makefile:
+            config.generate_makefile("Makefile")
+        if do_cmake:
+            config.generate_cmake("CMakeLists.txt")
+        if do_presets:
+            config.generate_cmake_presets()
 
         print(f"Generated from {args.from_config}:")
         for output in outputs:
@@ -543,8 +606,9 @@ def cmd_render(args: argparse.Namespace) -> None:
         sys.exit(1)
 
     update_deps = not getattr(args, "no_update_deps", False)
+    dry_run = getattr(args, "dry_run", False)
+    force = getattr(args, "force", False)
     skbuild_type = f"skbuild-{recipe.framework}"
-    output_dir.mkdir(parents=True, exist_ok=True)
     gen = SkbuildProjectGenerator(
         project_name,
         skbuild_type,
@@ -552,8 +616,15 @@ def cmd_render(args: argparse.Namespace) -> None:
         env_tool=env_tool,
         context={"options": options},
         user_config=user_config,
-        update_deps=update_deps,
+        # A preview reports paths only, so it never needs a PyPI query.
+        update_deps=update_deps and not dry_run,
+        offline=getattr(args, "offline", False),
     )
+    output_config = output_dir / _determine_plain_config_name(config_path.name)
+    _write_policy([*gen.output_paths(), output_config], dry_run=dry_run, force=force)
+    if dry_run:
+        return
+    output_dir.mkdir(parents=True, exist_ok=True)
     created = gen.generate()
 
     generated_flex = output_dir / config_path.name
@@ -562,8 +633,6 @@ def cmd_render(args: argparse.Namespace) -> None:
         created = [p for p in created if p != generated_flex]
 
     plain_config = _create_plain_config(data, options)
-    output_config_name = _determine_plain_config_name(config_path.name)
-    output_config = output_dir / output_config_name
     _write_plain_config(output_config, plain_config)
     created.append(output_config)
 
@@ -571,6 +640,79 @@ def cmd_render(args: argparse.Namespace) -> None:
     for path in created:
         rel_path = path.relative_to(output_dir)
         print(f"  {rel_path}")
+
+
+def cmd_doctor(args: argparse.Namespace) -> None:
+    """Inspect available tools and return nonzero when requirements are missing."""
+    from buildgen.common.toolchain import (
+        diagnostics_json,
+        discover_tools,
+        required_tools,
+    )
+
+    tools = discover_tools()
+    if getattr(args, "json", False):
+        print(diagnostics_json(tools))
+    else:
+        print("buildgen toolchain")
+        for info in tools.values():
+            status = info.version or "missing"
+            print(f"  {info.name:<7} {status} ({info.path or 'not found'})")
+    missing: set[str] = set()
+    if getattr(args, "recipe", None):
+        if not is_valid_recipe(args.recipe):
+            raise ValueError(f"Unknown recipe: {args.recipe}")
+        recipe = get_recipe(args.recipe)
+        missing = required_tools(recipe.build_system, recipe.language) - {
+            name for name, info in tools.items() if info.available
+        }
+        if missing:
+            print(
+                f"Missing tools for {recipe.name}: {', '.join(sorted(missing))}",
+                file=sys.stderr,
+            )
+    if missing:
+        raise SystemExit(1)
+
+
+def cmd_validate(args: argparse.Namespace) -> None:
+    """Validate a project configuration without generating files."""
+    from buildgen.common.project import ProjectConfig
+
+    path = Path(args.config)
+    data = _load_configurable_config(path)
+    if "name" not in data:
+        print(f"{path}: name is required", file=sys.stderr)
+        raise SystemExit(1)
+    errors = ProjectConfig.from_dict(data).validate(data)
+    if errors:
+        for error in errors:
+            print(f"{path}: {error}", file=sys.stderr)
+        raise SystemExit(1)
+    print(f"Valid project configuration: {path}")
+
+
+def cmd_lock(args: argparse.Namespace) -> None:
+    """Resolve Python tool versions into a project-local lock."""
+    from buildgen import __version__
+    from buildgen.common.deps import (
+        get_default_versions,
+        resolve_latest_versions,
+        write_lock,
+    )
+
+    if not is_valid_recipe(args.recipe):
+        raise ValueError(f"Unknown recipe: {args.recipe}")
+    # Every package buildgen can write into a generated project, so a lock
+    # stays complete when the recipe's templates gain a dependency.
+    dependencies = get_default_versions() if args.offline else resolve_latest_versions()
+    write_lock(
+        Path(args.output),
+        recipe=args.recipe,
+        dependencies=dependencies,
+        buildgen_version=__version__,
+    )
+    print(f"Wrote lock file: {args.output}")
 
 
 def _load_configurable_config(path: Path) -> dict[str, Any]:

@@ -12,7 +12,11 @@ from mako.lookup import TemplateLookup
 from mako.template import Template
 
 from buildgen.common.config import UserConfig
-from buildgen.common.deps import get_default_versions, resolve_latest_versions
+from buildgen.common.deps import (
+    get_default_versions,
+    load_lock,
+    resolve_latest_versions,
+)
 from buildgen.skbuild.templates import (
     SKBUILD_TYPES,
     TEMPLATE_FILES,
@@ -73,6 +77,8 @@ class SkbuildProjectGenerator:
         context: dict[str, Any] | None = None,
         user_config: UserConfig | None = None,
         update_deps: bool = True,
+        offline: bool = False,
+        lock_path: Path | None = None,
     ):
         """Initialize the generator.
 
@@ -87,6 +93,9 @@ class SkbuildProjectGenerator:
             user_config: User-level config from ~/.buildgen/config.toml.
             update_deps: Resolve latest dependency versions from PyPI
                 (default True). Set False to use bundled defaults.
+            offline: Never query PyPI; use the lock file or bundled defaults.
+            lock_path: Lock file to read versions from
+                (default: output_dir/buildgen.lock).
         """
         if template_type not in TEMPLATE_FILES:
             valid = ", ".join(TEMPLATE_FILES.keys())
@@ -106,6 +115,8 @@ class SkbuildProjectGenerator:
         self.output_dir = Path(output_dir) if output_dir else Path.cwd() / name
         self.env_tool = env_tool
         self.project_dir = project_dir
+        self.offline = offline
+        self.lock_path = lock_path or self.output_dir / "buildgen.lock"
 
         # Build context: user config as base, explicit context overrides
         base_ctx: dict[str, Any] = {"user": {}, "defaults": {}}
@@ -117,8 +128,15 @@ class SkbuildProjectGenerator:
         if "options" not in self.context:
             self.context["options"] = {}
 
-        # Resolve dependency versions: user config pins > PyPI/defaults
-        if update_deps:
+        # Resolve dependency versions: user config pins > lock > PyPI > defaults.
+        # A lock present in the output directory is the project's reproducibility
+        # record, so it wins over a PyPI query whether or not --offline is set.
+        # Packages it predates fall back to the bundled defaults.
+        if self.lock_path.is_file():
+            locked = load_lock(self.lock_path)["dependencies"]
+            dep_versions = get_default_versions()
+            dep_versions.update({str(key): str(value) for key, value in locked.items()})
+        elif update_deps and not offline:
             dep_versions = resolve_latest_versions()
         else:
             dep_versions = get_default_versions()
@@ -139,6 +157,10 @@ class SkbuildProjectGenerator:
         # Use Mako to render the path (handles ${name} syntax)
         rendered = Template(text=path_template).render(name=self.name)
         return self.output_dir / rendered
+
+    def output_paths(self) -> list[Path]:
+        """Paths generate() would write, without writing them."""
+        return [self._render_path(path) for path in self.resolved_templates]
 
     def _render_template(self, template_path: Path) -> str:
         """Load and render a template file.

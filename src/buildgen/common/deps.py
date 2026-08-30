@@ -8,6 +8,8 @@ import json
 import urllib.error
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
+from typing import Any
 
 from buildgen.common import versions
 
@@ -76,3 +78,37 @@ def get_default_versions(
     if packages is None:
         return dict(DEFAULT_VERSIONS)
     return {pkg: DEFAULT_VERSIONS.get(pkg, "0") for pkg in packages}
+
+
+def load_lock(path: Path) -> dict[str, Any]:
+    """Load a buildgen lock file and validate its top-level shape."""
+    with path.open(encoding="utf-8") as handle:
+        data = json.load(handle)
+    if not isinstance(data, dict) or not isinstance(data.get("dependencies", {}), dict):
+        raise ValueError(f"Invalid buildgen lock file: {path}")  # noqa: TRY004
+    lock_version = data.get("lock_version")
+    if lock_version != versions.LOCK_VERSION:
+        raise ValueError(
+            f"Unsupported buildgen lock version {lock_version!r} in {path}: "
+            f"this buildgen writes version {versions.LOCK_VERSION}"
+        )
+    return data
+
+
+def write_lock(
+    path: Path,
+    *,
+    recipe: str,
+    dependencies: dict[str, str],
+    buildgen_version: str,
+    inputs: dict[str, Any] | None = None,
+) -> None:
+    """Write a deterministic project-local dependency lock."""
+    data = {
+        "lock_version": versions.LOCK_VERSION,
+        "buildgen_version": buildgen_version,
+        "recipe": recipe,
+        "inputs": inputs or {},
+        "dependencies": dict(sorted(dependencies.items())),
+    }
+    path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
