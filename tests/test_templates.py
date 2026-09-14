@@ -4,9 +4,11 @@ from pathlib import Path
 
 import pytest
 
+from buildgen.cmake.project_generator import CMakeProjectGenerator
 from buildgen.skbuild.templates import (
     LEGACY_TO_RECIPE_PATH,
     SKBUILD_TYPES,
+    TEMPLATE_FILES,
     TEMPLATES_DIR,
     resolve_template_files,
 )
@@ -214,14 +216,15 @@ class TestResolveTemplateFiles:
         # resolve_template_files still uses legacy type names internally
         resolved = resolve_template_files("skbuild-pybind11")
 
-        # Should have 13 files
-        assert len(resolved) == 13
+        # Should have 14 files
+        assert len(resolved) == 14
 
         # Check expected output paths
         assert ".gitignore" in resolved
         assert ".github/workflows/ci.yml" in resolved
         assert ".github/workflows/build-publish.yml" in resolved
         assert "CHANGELOG.md" in resolved
+        assert "TODO.md" in resolved
         assert "LICENSE" in resolved
         assert "Makefile" in resolved
         assert "pyproject.toml" in resolved
@@ -286,3 +289,21 @@ class TestSkbuildTypes:
         assert LEGACY_TO_RECIPE_PATH["skbuild-cython"] == "py/cython"
         assert LEGACY_TO_RECIPE_PATH["skbuild-c"] == "py/cext"
         assert LEGACY_TO_RECIPE_PATH["skbuild-nanobind"] == "py/nanobind"
+
+
+class TestTodoTemplate:
+    """Every recipe seeds a TODO.md with priority headings."""
+
+    @pytest.mark.parametrize(
+        "files",
+        [*TEMPLATE_FILES.values(), *CMakeProjectGenerator.TEMPLATE_FILES.values()],
+    )
+    def test_every_recipe_maps_todo(self, files):
+        assert files["TODO.md"] == "common/TODO.md.mako"
+
+    def test_rendered_headings_survive_mako(self, tmp_path):
+        # A line-leading "##" is a Mako comment; the headings must still render.
+        CMakeProjectGenerator("app", "c/executable", tmp_path).generate()
+        assert (tmp_path / "TODO.md").read_text() == (
+            "# TODO\n\n## Critical\n\n## High\n\n## Medium\n\n## Low\n"
+        )

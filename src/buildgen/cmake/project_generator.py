@@ -39,12 +39,14 @@ class CMakeProjectGenerator:
         "cpp/executable": {
             ".gitignore": "common/gitignore.cmake.mako",
             "Makefile": "common/Makefile.cmake.mako",
+            "TODO.md": "common/TODO.md.mako",
             "CMakeLists.txt": "CMakeLists.txt.mako",
             "src/main.cpp": "src/main.cpp.mako",
         },
         "cpp/static": {
             ".gitignore": "common/gitignore.cmake.mako",
             "Makefile": "common/Makefile.cmake.mako",
+            "TODO.md": "common/TODO.md.mako",
             "CMakeLists.txt": "CMakeLists.txt.mako",
             "src/lib.cpp": "src/lib.cpp.mako",
             "include/${name}/lib.hpp": "include/${name}/lib.hpp.mako",
@@ -52,6 +54,7 @@ class CMakeProjectGenerator:
         "cpp/shared": {
             ".gitignore": "common/gitignore.cmake.mako",
             "Makefile": "common/Makefile.cmake.mako",
+            "TODO.md": "common/TODO.md.mako",
             "CMakeLists.txt": "CMakeLists.txt.mako",
             "src/lib.cpp": "src/lib.cpp.mako",
             "include/${name}/lib.hpp": "include/${name}/lib.hpp.mako",
@@ -59,12 +62,14 @@ class CMakeProjectGenerator:
         "cpp/header-only": {
             ".gitignore": "common/gitignore.cmake.mako",
             "Makefile": "common/Makefile.cmake.mako",
+            "TODO.md": "common/TODO.md.mako",
             "CMakeLists.txt": "CMakeLists.txt.mako",
             "include/${name}/lib.hpp": "include/${name}/lib.hpp.mako",
         },
         "cpp/library-with-tests": {
             ".gitignore": "common/gitignore.cmake.mako",
             "Makefile": "common/Makefile.cmake.mako",
+            "TODO.md": "common/TODO.md.mako",
             "CMakeLists.txt": "CMakeLists.txt.mako",
             "src/lib.cpp": "src/lib.cpp.mako",
             "include/${name}/lib.hpp": "include/${name}/lib.hpp.mako",
@@ -73,6 +78,7 @@ class CMakeProjectGenerator:
         "cpp/app-with-lib": {
             ".gitignore": "common/gitignore.cmake.mako",
             "Makefile": "common/Makefile.cmake.mako",
+            "TODO.md": "common/TODO.md.mako",
             "CMakeLists.txt": "CMakeLists.txt.mako",
             "src/main.cpp": "src/main.cpp.mako",
             "src/lib.cpp": "src/lib.cpp.mako",
@@ -81,6 +87,7 @@ class CMakeProjectGenerator:
         "cpp/full": {
             ".gitignore": "common/gitignore.cmake.mako",
             "Makefile": "common/Makefile.cmake.mako",
+            "TODO.md": "common/TODO.md.mako",
             "CMakeLists.txt": "CMakeLists.txt.mako",
             "src/main.cpp": "src/main.cpp.mako",
             "src/lib.cpp": "src/lib.cpp.mako",
@@ -91,12 +98,14 @@ class CMakeProjectGenerator:
         "c/executable": {
             ".gitignore": "common/gitignore.cmake.mako",
             "Makefile": "common/Makefile.cmake.mako",
+            "TODO.md": "common/TODO.md.mako",
             "CMakeLists.txt": "CMakeLists.txt.mako",
             "src/main.c": "src/main.c.mako",
         },
         "c/static": {
             ".gitignore": "common/gitignore.cmake.mako",
             "Makefile": "common/Makefile.cmake.mako",
+            "TODO.md": "common/TODO.md.mako",
             "CMakeLists.txt": "CMakeLists.txt.mako",
             "src/lib.c": "src/lib.c.mako",
             "include/${name}/lib.h": "include/${name}/lib.h.mako",
@@ -104,6 +113,7 @@ class CMakeProjectGenerator:
         "c/shared": {
             ".gitignore": "common/gitignore.cmake.mako",
             "Makefile": "common/Makefile.cmake.mako",
+            "TODO.md": "common/TODO.md.mako",
             "CMakeLists.txt": "CMakeLists.txt.mako",
             "src/lib.c": "src/lib.c.mako",
             "include/${name}/lib.h": "include/${name}/lib.h.mako",
@@ -111,12 +121,14 @@ class CMakeProjectGenerator:
         "c/header-only": {
             ".gitignore": "common/gitignore.cmake.mako",
             "Makefile": "common/Makefile.cmake.mako",
+            "TODO.md": "common/TODO.md.mako",
             "CMakeLists.txt": "CMakeLists.txt.mako",
             "include/${name}/lib.h": "include/${name}/lib.h.mako",
         },
         "c/library-with-tests": {
             ".gitignore": "common/gitignore.cmake.mako",
             "Makefile": "common/Makefile.cmake.mako",
+            "TODO.md": "common/TODO.md.mako",
             "CMakeLists.txt": "CMakeLists.txt.mako",
             "src/lib.c": "src/lib.c.mako",
             "include/${name}/lib.h": "include/${name}/lib.h.mako",
@@ -125,6 +137,7 @@ class CMakeProjectGenerator:
         "c/app-with-lib": {
             ".gitignore": "common/gitignore.cmake.mako",
             "Makefile": "common/Makefile.cmake.mako",
+            "TODO.md": "common/TODO.md.mako",
             "CMakeLists.txt": "CMakeLists.txt.mako",
             "src/main.c": "src/main.c.mako",
             "src/lib.c": "src/lib.c.mako",
@@ -133,6 +146,7 @@ class CMakeProjectGenerator:
         "c/full": {
             ".gitignore": "common/gitignore.cmake.mako",
             "Makefile": "common/Makefile.cmake.mako",
+            "TODO.md": "common/TODO.md.mako",
             "CMakeLists.txt": "CMakeLists.txt.mako",
             "src/main.c": "src/main.c.mako",
             "src/lib.c": "src/lib.c.mako",

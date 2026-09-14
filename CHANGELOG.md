@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.4.1]
+
+### Added
+
+- **`TODO.md` in every recipe.** All C, C++, and Python recipes now generate a `TODO.md` with `Critical`, `High`, `Medium`, and `Low` sections, from the overridable `common/TODO.md.mako`.
+
 ## [0.4.0]
 
 ### Added
