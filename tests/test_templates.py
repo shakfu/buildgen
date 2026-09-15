@@ -1,10 +1,12 @@
 """Tests for template resolver and override system."""
 
+import os
 from pathlib import Path
 
 import pytest
 
 from buildgen.cmake.project_generator import CMakeProjectGenerator
+from buildgen.skbuild.generator import SkbuildProjectGenerator
 from buildgen.skbuild.templates import (
     LEGACY_TO_RECIPE_PATH,
     SKBUILD_TYPES,
@@ -306,4 +308,28 @@ class TestTodoTemplate:
         CMakeProjectGenerator("app", "c/executable", tmp_path).generate()
         assert (tmp_path / "TODO.md").read_text() == (
             "# TODO\n\n## Critical\n\n## High\n\n## Medium\n\n## Low\n"
+        )
+
+    @pytest.mark.parametrize(
+        "make_generator",
+        [
+            lambda out: CMakeProjectGenerator("app", "c/executable", out),
+            lambda out: SkbuildProjectGenerator("app", "skbuild-pybind11", out),
+        ],
+        ids=["cmake", "skbuild"],
+    )
+    def test_crlf_template_writes_native_line_endings(
+        self, tmp_path, monkeypatch, make_generator
+    ):
+        # A CRLF template (Windows checkout or override) must not yield \r\r\n.
+        src = BUILTIN_TEMPLATES_DIR / "common/TODO.md.mako"
+        override = tmp_path / "env/common/TODO.md.mako"
+        override.parent.mkdir(parents=True)
+        override.write_bytes(src.read_bytes().replace(b"\n", b"\r\n"))
+        monkeypatch.setenv("BUILDGEN_TEMPLATES", str(tmp_path / "env"))
+
+        make_generator(tmp_path / "out").generate()
+        written = (tmp_path / "out/TODO.md").read_bytes()
+        assert written.replace(os.linesep.encode(), b"\n") == (
+            b"# TODO\n\n## Critical\n\n## High\n\n## Medium\n\n## Low\n"
         )

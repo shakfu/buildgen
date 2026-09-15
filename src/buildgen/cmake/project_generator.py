@@ -229,7 +229,9 @@ class CMakeProjectGenerator:
         render_args: dict[str, Any] = {"name": self.name}
         if self.context:
             render_args.update(self.context)
-        return template.render(**render_args)
+        # Mako keeps a CRLF template's line endings; write_text would then emit
+        # \r\r\n on Windows.
+        return template.render(**render_args).replace("\r\n", "\n")
 
     def generate(self) -> list[Path]:
         """Generate all project files.
