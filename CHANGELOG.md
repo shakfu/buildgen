@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.4.2]
+
+### Fixed
+
+- **Doubled line endings from CRLF templates on Windows.** Mako keeps a template's `\r\n` endings, and writing the rendered text in text mode turned each into `\r\r\n`, so generated files showed a blank line after every line. This hit override templates saved with CRLF and templates from a Windows git checkout. Rendered output is now normalized to `\n` before writing, which yields native line endings on every platform.
+
 ## [0.4.1]
 
 ### Added
