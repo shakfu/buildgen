@@ -325,7 +325,9 @@ class TestTodoTemplate:
         src = BUILTIN_TEMPLATES_DIR / "common/TODO.md.mako"
         override = tmp_path / "env/common/TODO.md.mako"
         override.parent.mkdir(parents=True)
-        override.write_bytes(src.read_bytes().replace(b"\n", b"\r\n"))
+        override.write_bytes(
+            src.read_bytes().replace(b"\r\n", b"\n").replace(b"\n", b"\r\n")
+        )
         monkeypatch.setenv("BUILDGEN_TEMPLATES", str(tmp_path / "env"))
 
         make_generator(tmp_path / "out").generate()
