@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.4.3]
+
+## Fixed
+
+- **Removed all traces of codecov/codecov-action**
+
 ## [0.4.2]
 
 ### Fixed
@@ -141,7 +147,7 @@ Single place to update tools and dependencies (with update to latest).
 
 - **`buildgen list`** labels the `py` category "Python Recipes" rather than "Python Extension Recipes", since it now holds a non-extension recipe.
 
-- **GitHub Actions pins** updated across this repo's workflows and the generated-project templates: `astral-sh/setup-uv` to `@v10`. The rest (`actions/checkout@v7`, `actions/upload-artifact@v7`, `actions/download-artifact@v8`, `codecov/codecov-action@v7`, `docker/setup-qemu-action@v4`, `pypa/cibuildwheel@v4`) were already current.
+- **GitHub Actions pins** updated across this repo's workflows and the generated-project templates: `astral-sh/setup-uv` to `@v10`. The rest (`actions/checkout@v7`, `actions/upload-artifact@v7`, `actions/download-artifact@v8`, `docker/setup-qemu-action@v4`, `pypa/cibuildwheel@v4`) were already current.
 
 ### Fixed
 

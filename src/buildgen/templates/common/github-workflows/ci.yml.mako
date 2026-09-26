@@ -68,13 +68,6 @@ jobs:
       - name: Run tests
         run: uv run pytest tests/ -v --cov=src/${name} --cov-report=xml
 
-      - name: Upload coverage
-        uses: ${V.action('codecov/codecov-action')}
-        with:
-          files: coverage.xml
-          fail_ci_if_error: false
-          token: ${"${{ secrets.CODECOV_TOKEN }}"}
-
   build:
     name: Build (${"${{ matrix.os }}"}/${"${{ matrix.python-version }}"})
     needs: qa

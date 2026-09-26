@@ -51,7 +51,6 @@ ACTIONS: dict[str, str] = {
     "actions/download-artifact": "v8",
     "actions/upload-artifact": "v7",
     "astral-sh/setup-uv": "v10.0.1",
-    "codecov/codecov-action": "v7",
     "docker/setup-qemu-action": "v4",
     "pypa/cibuildwheel": "v4.2",
     "pypa/gh-action-pypi-publish": "release/v1",
