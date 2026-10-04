@@ -36,6 +36,7 @@ Examples:
   buildgen new myext --recipe py/pybind11     # Python extension
   buildgen new myext -r py/cython --env venv  # Use venv instead of uv
   buildgen new mylib -r c/static -o /tmp/lib  # Custom output directory
+  buildgen new my-book -r quarto/book         # Quarto book
 
 Use 'buildgen list' to see available recipes.""",
     )
@@ -92,7 +93,7 @@ Examples:
     parser.add_argument(
         "-c",
         "--category",
-        choices=["cpp", "c", "py"],
+        choices=["cpp", "c", "py", "quarto"],
         help="Filter by category",
     )
     parser.set_defaults(func=cmd_list)
@@ -124,7 +125,7 @@ Examples:
     parser.add_argument(
         "-c",
         "--category",
-        choices=["cpp", "c", "py"],
+        choices=["cpp", "c", "py", "quarto"],
         help="Test only recipes in this category",
     )
     parser.add_argument(

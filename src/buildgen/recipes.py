@@ -4,6 +4,8 @@ Recipes use a `category/variant` naming convention:
 - cpp/executable, cpp/static, cpp/shared, etc.
 - c/executable, c/static, c/shared, etc.
 - py/pybind11, py/nanobind, py/cython, py/cext, py/nodeps
+- quarto/project, quarto/document, quarto/presentation, quarto/dashboard,
+  quarto/website, quarto/blog, quarto/book, quarto/manuscript
 """
 
 from collections.abc import Callable
@@ -17,10 +19,11 @@ class Recipe:
 
     name: str  # e.g., "cpp/executable"
     description: str
-    category: str  # e.g., "cpp", "c", "py"
+    category: str  # e.g., "cpp", "c", "py", "quarto"
     variant: str  # e.g., "executable", "pybind11"
-    build_system: str  # "cmake", "skbuild", or "python" (pure Python, no native build)
-    language: str  # "c", "cpp", "cython", "python"
+    # "cmake", "skbuild", "python" (pure Python, no native build), or "quarto"
+    build_system: str
+    language: str  # "c", "cpp", "cython", "python", "markdown"
     framework: str | None = None  # "pybind11", "nanobind", etc.
     configurable: bool = False
     config_template: str | None = None
@@ -215,6 +218,71 @@ RECIPES: dict[str, Recipe] = {
         framework=None,
         template_key="py/nodeps",
         default_options={"env": "uv", "pure_python": True},
+    ),
+    # Quarto recipes
+    "quarto/project": Recipe(
+        name="quarto/project",
+        description="Quarto project: documents sharing _quarto.yml",
+        category="quarto",
+        variant="project",
+        build_system="quarto",
+        language="markdown",
+    ),
+    "quarto/document": Recipe(
+        name="quarto/document",
+        description="Quarto document: html, pdf, docx, typst",
+        category="quarto",
+        variant="document",
+        build_system="quarto",
+        language="markdown",
+    ),
+    "quarto/presentation": Recipe(
+        name="quarto/presentation",
+        description="Quarto presentation: revealjs, beamer, pptx",
+        category="quarto",
+        variant="presentation",
+        build_system="quarto",
+        language="markdown",
+    ),
+    "quarto/dashboard": Recipe(
+        name="quarto/dashboard",
+        description="Quarto dashboard",
+        category="quarto",
+        variant="dashboard",
+        build_system="quarto",
+        language="markdown",
+    ),
+    "quarto/website": Recipe(
+        name="quarto/website",
+        description="Quarto website",
+        category="quarto",
+        variant="website",
+        build_system="quarto",
+        language="markdown",
+    ),
+    "quarto/blog": Recipe(
+        name="quarto/blog",
+        description="Quarto blog (website with a post listing)",
+        category="quarto",
+        variant="blog",
+        build_system="quarto",
+        language="markdown",
+    ),
+    "quarto/book": Recipe(
+        name="quarto/book",
+        description="Quarto book",
+        category="quarto",
+        variant="book",
+        build_system="quarto",
+        language="markdown",
+    ),
+    "quarto/manuscript": Recipe(
+        name="quarto/manuscript",
+        description="Quarto manuscript (scholarly article)",
+        category="quarto",
+        variant="manuscript",
+        build_system="quarto",
+        language="markdown",
     ),
 }
 

@@ -4,6 +4,17 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.5.0]
+
+### Added
+
+- **`quarto/*` recipes** - single-file `document` (html, pdf, docx, typst), `presentation` (revealjs, beamer, pptx), and `dashboard`: one `.qmd` whose header sets per-format defaults, with no `_quarto.yml`. Multi-document [projects](https://quarto.org/docs/projects/quarto-projects.html) `project`, `website`, `blog`, `book`, and `manuscript`, configured by `_quarto.yml`. Each has a Makefile frontend (`render`, `preview`, `clean`). Templates over shelling out to `quarto create project`, so generation needs no Quarto install and uses the template override chain. A project's `_quarto.yml` sets `output-dir` explicitly so `make clean` and the config agree, and excludes `TODO.md` from rendering, which Quarto would otherwise publish as a page. `Recipe.build_system` gains `"quarto"`; `doctor --recipe quarto/*` checks for `quarto` and `make`.
+
+### Changed
+
+- **`CMakeProjectGenerator` subclasses a new `TemplateProjectGenerator`**, which `QuartoProjectGenerator` shares. Subclasses differ only in their template map and name rule.
+- **`doctor` reports `quarto`** alongside the other tools, in both text and `--json` output.
+
 ## [0.4.3]
 
 ## Fixed

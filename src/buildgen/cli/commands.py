@@ -11,6 +11,7 @@ from typing import TYPE_CHECKING, Any, Optional
 
 if TYPE_CHECKING:
     from buildgen.common.config import UserConfig
+    from buildgen.templates.generator import TemplateProjectGenerator
 
 from mako.template import Template
 
@@ -64,9 +65,16 @@ def _recipe_context(recipe: "Recipe") -> dict[str, Any] | None:
     return None
 
 
+def _template_generators() -> dict[str, type["TemplateProjectGenerator"]]:
+    """Generators for recipes rendered from a plain template map."""
+    from buildgen.cmake.project_generator import CMakeProjectGenerator
+    from buildgen.quarto.generator import QuartoProjectGenerator
+
+    return {"cmake": CMakeProjectGenerator, "quarto": QuartoProjectGenerator}
+
+
 def cmd_new(args: argparse.Namespace) -> None:
     """Create a new project from a recipe."""
-    from buildgen.cmake.project_generator import CMakeProjectGenerator
     from buildgen.common.config import load_user_config
     from buildgen.skbuild.generator import SkbuildProjectGenerator
 
@@ -130,21 +138,22 @@ def cmd_new(args: argparse.Namespace) -> None:
             print(f"  {rel_path}")
         return
 
-    # Handle CMake-based templates (cpp/* and c/* recipes). Dispatch is keyed
+    # Handle template-map recipes (cpp/*, c/*, quarto/*). Dispatch is keyed
     # off the recipe registry, so a recipe registered without a matching
     # template set fails with the generator's own error naming what is missing,
     # rather than a vague "no generator available".
-    if recipe.build_system == "cmake":
-        cmake_gen = CMakeProjectGenerator(
-            name, recipe_name, output_dir, user_config=user_config
+    generator_cls = _template_generators().get(recipe.build_system)
+    if generator_cls is not None:
+        template_gen = generator_cls(
+            name, recipe.name, output_dir, user_config=user_config
         )
-        _write_policy(cmake_gen.output_paths(), dry_run=dry_run, force=force)
+        _write_policy(template_gen.output_paths(), dry_run=dry_run, force=force)
         if dry_run:
             return
-        created = cmake_gen.generate()
-        print(f"Created {recipe.name} project: {cmake_gen.output_dir}/")
+        created = template_gen.generate()
+        print(f"Created {recipe.name} project: {template_gen.output_dir}/")
         for path in created:
-            rel_path = path.relative_to(cmake_gen.output_dir)
+            rel_path = path.relative_to(template_gen.output_dir)
             print(f"  {rel_path}")
         return
 
@@ -204,13 +213,14 @@ def cmd_list(args: argparse.Namespace) -> None:
         "cpp": "C++ Recipes",
         "c": "C Recipes",
         "py": "Python Recipes",
+        "quarto": "Quarto Recipes",
     }
 
     # Filter by category if specified
     category_filter = getattr(args, "category", None)
 
     print("Available recipes:\n")
-    for category in ["cpp", "c", "py"]:
+    for category in ["cpp", "c", "py", "quarto"]:
         if category not in categories:
             continue
         if category_filter and category != category_filter:
@@ -226,7 +236,6 @@ def cmd_test(args: argparse.Namespace) -> None:
     import subprocess
     import tempfile
 
-    from buildgen.cmake.project_generator import CMakeProjectGenerator
     from buildgen.skbuild.generator import SkbuildProjectGenerator
 
     # Handle --all flag (shortcut for --build --test)
@@ -297,11 +306,10 @@ def cmd_test(args: argparse.Namespace) -> None:
                     offline=True,
                 )
                 gen.generate()
-            elif recipe.build_system == "cmake":
-                cmake_gen = CMakeProjectGenerator(
+            elif recipe.build_system in _template_generators():
+                _template_generators()[recipe.build_system](
                     project_name, recipe_name, project_dir
-                )
-                cmake_gen.generate()
+                ).generate()
             else:
                 result["error"] = (
                     f"No generator for build system '{recipe.build_system}'"
@@ -312,7 +320,25 @@ def cmd_test(args: argparse.Namespace) -> None:
             result["generate"] = True
 
             if do_build:
-                if recipe.build_system == "skbuild":
+                if recipe.build_system == "quarto":
+                    # Every declared format, so pdf and beamer need LaTeX. The
+                    # Makefile names the source: outside a project, a bare
+                    # `quarto render` renders nothing and still exits 0.
+                    proc = subprocess.run(
+                        ["make", "render"],
+                        cwd=project_dir,
+                        capture_output=True,
+                        text=True,
+                        timeout=300,
+                        check=False,
+                    )
+                    if proc.returncode == 0:
+                        result["build"] = True
+                    else:
+                        result["error"] = (
+                            proc.stderr[:500] if proc.stderr else "Render failed"
+                        )
+                elif recipe.build_system == "skbuild":
                     proc = subprocess.run(
                         ["uv", "sync"],
                         cwd=project_dir,
@@ -343,7 +369,8 @@ def cmd_test(args: argparse.Namespace) -> None:
                             proc.stderr[:500] if proc.stderr else "Build failed"
                         )
 
-                if result["build"] and do_test:
+                # Quarto projects have no test suite; a render is the check.
+                if result["build"] and do_test and recipe.build_system != "quarto":
                     if recipe.build_system == "skbuild":
                         proc = subprocess.run(
                             ["uv", "run", "pytest", "-v"],
@@ -873,6 +900,7 @@ def cmd_templates_list(args: argparse.Namespace) -> None:
         "py": "Python Templates",
         "cpp": "C++ Templates",
         "c": "C Templates",
+        "quarto": "Quarto Templates",
     }
 
     print("Available templates:\n")

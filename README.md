@@ -31,6 +31,7 @@ buildgen list
 - **CMake Frontend**: Use CMake as build system with convenient Makefile frontend
 - **Project Templates**: Quick-start templates for common project types
 - **scikit-build-core Templates**: Python extension project scaffolding (pybind11, cython, nanobind, C)
+- **Quarto Projects**: Default, website, blog, book, and manuscript projects with a Makefile frontend
 - **Template Customization**: Override templates per-project, per-user, or via environment variable (Mako syntax)
 - **Configurable Project Recipes**: 2-step JSON/YAML recipes which include options and which are `rendered` to generate the project infrastructure.
 - **User Configuration**: Global `~/.buildgen/config.toml` for author identity and project defaults (license, language standards, Python version, env tool)
@@ -50,6 +51,7 @@ buildgen list
 buildgen new myapp -r cpp/executable
 buildgen new mylib -r c/static
 buildgen new myext -r py/pybind11
+buildgen new my-book -r quarto/book
 
 # List available recipes
 buildgen list
@@ -392,6 +394,19 @@ buildgen list
 |--------|-------------|
 | `py/nodeps` | Pure-Python package with no runtime dependencies |
 
+**Quarto Recipes** (Makefile frontend):
+
+| Recipe | Kind | Description |
+|--------|------|-------------|
+| `quarto/document` | single file | Document: html, pdf, docx, typst |
+| `quarto/presentation` | single file | Presentation: revealjs, beamer, pptx |
+| `quarto/dashboard` | single file | Dashboard (HTML) |
+| `quarto/project` | [project](https://quarto.org/docs/projects/quarto-projects.html) | Documents sharing `_quarto.yml` options: html, pdf, docx |
+| `quarto/website` | [project](https://quarto.org/docs/websites/) | Website |
+| `quarto/blog` | project | Blog (website with a post listing) |
+| `quarto/book` | [project](https://quarto.org/docs/books/) | Book: html, pdf, epub |
+| `quarto/manuscript` | project | Manuscript (scholarly article) |
+
 ### Python Extension Projects
 
 Generate complete Python extension projects with scikit-build-core:
@@ -470,6 +485,61 @@ edit the block and run `buildgen render` again -- re-running `cmake` by itself
 will not pick up a change, because scikit-build-core re-applies its own defines
 on every build. The rendered `project.json` records the equivalent `cmake -D`
 flags for reference.
+
+### Quarto Projects
+
+Every `quarto/*` recipe adds a Makefile, `.gitignore`, and `TODO.md` to its
+Quarto sources. Rendering needs [Quarto](https://quarto.org/docs/get-started/)
+on `PATH`; generation does not.
+
+Single-file recipes (`document`, `presentation`, `dashboard`) generate one
+`<name>.qmd` and no `_quarto.yml`. The header sets defaults for each format
+the recipe targets, and every format renders next to the source. The Makefile
+names the source, since a bare `quarto render` outside a project renders
+nothing.
+
+Project recipes are multi-document and configured by `_quarto.yml`:
+
+- `website`, `blog`, `book`, `manuscript`: the sources `quarto create project`
+  writes for that type, plus additions from each guide: the book adds `epub`
+  ([books](https://quarto.org/docs/books/)), the blog an RSS navbar link
+  ([blogs](https://quarto.org/docs/websites/website-blog.html)), and the
+  manuscript abstract, keywords, and affiliations
+  ([manuscripts](https://quarto.org/docs/manuscripts/)).
+- `project`: three documents that share the formats, bibliography, and
+  numbering set in `_quarto.yml`. `notes/_metadata.yml` overrides them for one
+  directory. Typst is omitted: it would write the same `<doc>.pdf` as `pdf`.
+
+```bash
+buildgen new my-book -r quarto/book
+cd my-book
+make render                        # quarto render (every format)
+make render QUARTO_FLAGS="--to html"
+make preview                       # live reload
+make clean                         # remove output-dir and .quarto/
+```
+
+```text
+my-book/
+  _quarto.yml         # project: type: book, output-dir: _book
+  index.qmd intro.qmd summary.qmd references.qmd
+  references.bib
+  Makefile
+```
+
+Differences from `quarto create project`:
+
+- `_quarto.yml` sets `output-dir` explicitly, so `make clean` and the config
+  name the same directory. `quarto/project` uses `_output` rather than
+  rendering next to its sources.
+- `_quarto.yml` lists `render` targets so `TODO.md` is not published as a page.
+- `quarto/document` writes Typst output to `<name>-typst.pdf`, since `pdf`
+  already writes `<name>.pdf`.
+- Names may contain `-` and `.` (`my-book`), unlike the C/C++/Python recipes.
+- Author fields come from `[user] name` in `~/.buildgen/config.toml`, and are
+  omitted when it is unset.
+- Sample images are omitted. `pdf` and `beamer` need a LaTeX install
+  (`quarto install tinytex`).
 
 ### Configurable Recipe Workflow
 

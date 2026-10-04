@@ -10,6 +10,7 @@ from pathlib import Path
 import pytest
 
 from buildgen.cmake.project_generator import CMakeProjectGenerator
+from buildgen.quarto.generator import QuartoProjectGenerator
 from buildgen.recipes import RECIPES, Recipe
 from buildgen.skbuild.generator import SkbuildProjectGenerator
 
@@ -48,6 +49,8 @@ def _generate_project(
 
     if recipe.build_system == "cmake":
         generator = CMakeProjectGenerator(project_name, recipe_name, output_dir)
+    elif recipe.build_system == "quarto":
+        generator = QuartoProjectGenerator(project_name, recipe_name, output_dir)
     elif recipe.build_system in ("skbuild", "python"):
         skbuild_type = recipe.template_type
         env_tool = recipe.default_options.get("env", "uv")
@@ -145,6 +148,12 @@ def test_recipe_generates(build_project_dir_factory, recipe_name):
     elif recipe.build_system == "skbuild":
         assert (project_dir / "pyproject.toml").exists()
         assert (project_dir / "CMakeLists.txt").exists()
+    elif recipe.build_system == "quarto":
+        # Single-file recipes have no _quarto.yml; projects require one.
+        single = recipe_name in QuartoProjectGenerator.OUTPUTS
+        assert (project_dir / "_quarto.yml").exists() is not single
+        assert list(project_dir.glob("*.qmd"))
+        assert (project_dir / "Makefile").exists()
     else:
         assert (project_dir / "pyproject.toml").exists()
         assert not (project_dir / "CMakeLists.txt").exists()

@@ -4,7 +4,8 @@ A recipe is described in three places that are kept in sync by hand:
 
 - `buildgen.recipes.RECIPES` -- the user-visible catalogue,
 - `CMakeProjectGenerator.TEMPLATE_FILES` -- file maps for CMake recipes,
-- `buildgen.skbuild.templates.TEMPLATE_FILES` -- file maps for Python recipes.
+- `buildgen.skbuild.templates.TEMPLATE_FILES` -- file maps for Python recipes,
+- `QuartoProjectGenerator.TEMPLATE_FILES` -- file maps for Quarto recipes.
 
 Adding an entry to one and forgetting the others used to fail only at runtime,
 when a user ran the recipe. These tests turn that into a test failure.
@@ -15,6 +16,7 @@ from __future__ import annotations
 import pytest
 
 from buildgen.cmake.project_generator import CMakeProjectGenerator, is_cmake_recipe
+from buildgen.quarto.generator import QuartoProjectGenerator
 from buildgen.recipes import (
     LEGACY_TYPE_MAPPING,
     RECIPES,
@@ -30,7 +32,7 @@ from buildgen.skbuild.templates import (
 )
 from buildgen.templates.resolver import BUILTIN_TEMPLATES_DIR
 
-KNOWN_BUILD_SYSTEMS = {"cmake", "skbuild", "python"}
+KNOWN_BUILD_SYSTEMS = {"cmake", "skbuild", "python", "quarto"}
 
 
 class TestRecipeRegistry:
@@ -80,6 +82,21 @@ class TestCMakeRegistrySync:
     def test_is_cmake_recipe_rejects_unknown_names(self):
         assert not is_cmake_recipe("cpp/does-not-exist")
         assert not is_cmake_recipe("")
+
+
+class TestQuartoRegistrySync:
+    """RECIPES <-> QuartoProjectGenerator.TEMPLATE_FILES / OUTPUT_DIRS."""
+
+    def test_template_sets_match_the_registry(self):
+        quarto = {n for n, r in RECIPES.items() if r.build_system == "quarto"}
+        assert set(QuartoProjectGenerator.TEMPLATE_FILES) == quarto
+
+    def test_every_template_set_declares_where_output_goes(self):
+        """Projects have an output dir; single files list their outputs."""
+        dirs = set(QuartoProjectGenerator.OUTPUT_DIRS)
+        files = set(QuartoProjectGenerator.OUTPUTS)
+        assert not dirs & files
+        assert dirs | files == set(QuartoProjectGenerator.TEMPLATE_FILES)
 
 
 class TestPythonRegistrySync:
@@ -144,10 +161,18 @@ class TestTemplateFilesExist:
                 assert path.is_file(), f"{template_type}: missing {path}"
 
     @pytest.mark.parametrize(
-        "recipe_name", sorted(CMakeProjectGenerator.TEMPLATE_FILES)
+        ("generator", "recipe_name"),
+        [
+            (CMakeProjectGenerator, n)
+            for n in sorted(CMakeProjectGenerator.TEMPLATE_FILES)
+        ]
+        + [
+            (QuartoProjectGenerator, n)
+            for n in sorted(QuartoProjectGenerator.TEMPLATE_FILES)
+        ],
     )
-    def test_cmake_templates_exist(self, recipe_name):
-        for template_path in CMakeProjectGenerator.TEMPLATE_FILES[recipe_name].values():
+    def test_template_map_files_exist(self, generator, recipe_name):
+        for template_path in generator.TEMPLATE_FILES[recipe_name].values():
             if template_path.startswith("common/"):
                 path = BUILTIN_TEMPLATES_DIR / template_path
             else:

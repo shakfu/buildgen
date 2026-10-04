@@ -43,6 +43,7 @@ def discover_tools() -> dict[str, ToolInfo]:
         "cxx": "c++",
         "python": "python3",
         "uv": "uv",
+        "quarto": "quarto",
     }
     tools: dict[str, ToolInfo] = {}
     for name, executable in candidates.items():
@@ -55,6 +56,8 @@ def required_tools(build_system: str, language: str) -> set[str]:
     """Return tools required by a recipe's build system and language."""
     if build_system == "python":
         return {"python", "uv"}
+    if build_system == "quarto":
+        return {"quarto", "make"}
     if build_system == "skbuild":
         return {"python", "cmake", "uv"}
     required = {"cmake", "make"}
