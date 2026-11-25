@@ -4,9 +4,9 @@
 
 ## High
 
-- [ ] Run the `doctor` check before `new`, `test`, and `render`, so a missing tool fails before any file is written rather than inside a generated build.
+- [x] Run the `doctor` check before `new`, `test`, and `render`, so a missing tool fails before any file is written rather than inside a generated build.
 
-- [ ] Print an install suggestion per tool and platform, without running it.
+- [x] Print an install suggestion per tool and platform, without running it.
 
 ## Medium
 
