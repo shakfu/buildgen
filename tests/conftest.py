@@ -79,3 +79,15 @@ def build_project_dir_factory(
         return target
 
     return get_build_dir
+
+
+@pytest.fixture(autouse=True)
+def _all_tools_available(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Make the CLI preflight independent of the host toolchain."""
+    from buildgen.common import toolchain
+
+    tools = {
+        name: toolchain.ToolInfo(name, f"/usr/bin/{name}", "1.0")
+        for name in toolchain.INSTALL_HINTS
+    }
+    monkeypatch.setattr(toolchain, "discover_tools", lambda: tools)

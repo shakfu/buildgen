@@ -75,6 +75,11 @@ Use 'buildgen list' to see available recipes.""",
     parser.add_argument(
         "--dry-run", action="store_true", help="Preview generated files"
     )
+    parser.add_argument(
+        "--skip-doctor",
+        action="store_true",
+        help="Do not check for required tools first",
+    )
     parser.set_defaults(func=cmd_new)
 
 
@@ -156,6 +161,11 @@ Examples:
         "--keep",
         action="store_true",
         help="Keep output directory after testing",
+    )
+    parser.add_argument(
+        "--skip-doctor",
+        action="store_true",
+        help="Do not check for required tools first",
     )
     parser.set_defaults(func=cmd_test)
 
@@ -251,6 +261,11 @@ Examples:
     parser.add_argument("--force", action="store_true", help="Overwrite existing files")
     parser.add_argument(
         "--dry-run", action="store_true", help="Preview generated files"
+    )
+    parser.add_argument(
+        "--skip-doctor",
+        action="store_true",
+        help="Do not check for required tools first",
     )
     parser.set_defaults(func=cmd_render)
 

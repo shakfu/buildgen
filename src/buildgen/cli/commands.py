@@ -88,6 +88,7 @@ def cmd_new(args: argparse.Namespace) -> None:
         sys.exit(1)
 
     recipe = get_recipe(recipe_name)
+    _preflight(args, [recipe])
 
     # Determine output directory
     output_dir = Path(args.output) if args.output else Path(name)
@@ -266,6 +267,10 @@ def cmd_test(args: argparse.Namespace) -> None:
         recipes_to_test = [r.name for r in categories[args.category]]
     else:
         recipes_to_test = list(RECIPES.keys())
+
+    # Generation alone runs no external tool, so only a build needs the check.
+    if do_build:
+        _preflight(args, [get_recipe(name) for name in recipes_to_test])
 
     # Use provided output directory or create temp directory
     if args.output:
@@ -603,6 +608,7 @@ def cmd_render(args: argparse.Namespace) -> None:
             file=sys.stderr,
         )
         sys.exit(1)
+    _preflight(args, [recipe])
 
     project_name = data.get("name")
     if not project_name:
@@ -669,12 +675,39 @@ def cmd_render(args: argparse.Namespace) -> None:
         print(f"  {rel_path}")
 
 
+def _report_missing(label: str, missing: set[str]) -> None:
+    """Print missing tools and their install suggestions to stderr."""
+    from buildgen.common.toolchain import install_hint
+
+    print(f"Missing tools for {label}: {', '.join(sorted(missing))}", file=sys.stderr)
+    for name in sorted(missing):
+        hint = install_hint(name) or "no suggestion for this platform"
+        print(f"  {name}: {hint}", file=sys.stderr)
+
+
+def _preflight(args: argparse.Namespace, recipes: list["Recipe"]) -> None:
+    """Exit before writing files when tools the recipes need are missing."""
+    if getattr(args, "skip_doctor", False):
+        return
+    from buildgen.common.toolchain import discover_tools, missing_tools
+
+    missing = missing_tools(
+        [(r.build_system, r.language) for r in recipes], discover_tools()
+    )
+    if missing:
+        label = recipes[0].name if len(recipes) == 1 else f"{len(recipes)} recipes"
+        _report_missing(label, missing)
+        print("Use --skip-doctor to generate anyway.", file=sys.stderr)
+        raise SystemExit(1)
+
+
 def cmd_doctor(args: argparse.Namespace) -> None:
     """Inspect available tools and return nonzero when requirements are missing."""
     from buildgen.common.toolchain import (
         diagnostics_json,
         discover_tools,
-        required_tools,
+        install_hint,
+        missing_tools,
     )
 
     tools = discover_tools()
@@ -685,21 +718,17 @@ def cmd_doctor(args: argparse.Namespace) -> None:
         for info in tools.values():
             status = info.version or "missing"
             print(f"  {info.name:<7} {status} ({info.path or 'not found'})")
-    missing: set[str] = set()
+            hint = None if info.available else install_hint(info.name)
+            if hint:
+                print(f"          install: {hint}")
     if getattr(args, "recipe", None):
         if not is_valid_recipe(args.recipe):
             raise ValueError(f"Unknown recipe: {args.recipe}")
         recipe = get_recipe(args.recipe)
-        missing = required_tools(recipe.build_system, recipe.language) - {
-            name for name, info in tools.items() if info.available
-        }
+        missing = missing_tools([(recipe.build_system, recipe.language)], tools)
         if missing:
-            print(
-                f"Missing tools for {recipe.name}: {', '.join(sorted(missing))}",
-                file=sys.stderr,
-            )
-    if missing:
-        raise SystemExit(1)
+            _report_missing(recipe.name, missing)
+            raise SystemExit(1)
 
 
 def cmd_validate(args: argparse.Namespace) -> None:
