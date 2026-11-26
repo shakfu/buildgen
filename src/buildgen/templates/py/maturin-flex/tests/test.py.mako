@@ -1,0 +1,1 @@
+<%include file="/maturin/tests/test.py.mako"/>

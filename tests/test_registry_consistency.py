@@ -19,12 +19,14 @@ from buildgen.cmake.project_generator import CMakeProjectGenerator, is_cmake_rec
 from buildgen.quarto.generator import QuartoProjectGenerator
 from buildgen.recipes import (
     LEGACY_TYPE_MAPPING,
+    PYTHON_BUILD_SYSTEMS,
     RECIPES,
     get_recipe,
     resolve_recipe_name,
 )
 from buildgen.skbuild.templates import (
     LEGACY_TO_RECIPE_PATH,
+    MATURIN_TYPES,
     PY_PLAIN_TYPES,
     SKBUILD_TYPES,
     TEMPLATE_FILES,
@@ -32,7 +34,7 @@ from buildgen.skbuild.templates import (
 )
 from buildgen.templates.resolver import BUILTIN_TEMPLATES_DIR
 
-KNOWN_BUILD_SYSTEMS = {"cmake", "skbuild", "python", "quarto"}
+KNOWN_BUILD_SYSTEMS = {"cmake", "skbuild", "maturin", "python", "quarto"}
 
 
 class TestRecipeRegistry:
@@ -104,9 +106,7 @@ class TestPythonRegistrySync:
 
     @pytest.mark.parametrize(
         "recipe_name",
-        sorted(
-            n for n, r in RECIPES.items() if r.build_system in ("skbuild", "python")
-        ),
+        sorted(n for n, r in RECIPES.items() if r.build_system in PYTHON_BUILD_SYSTEMS),
     )
     def test_python_recipe_has_templates(self, recipe_name):
         assert RECIPES[recipe_name].template_type in TEMPLATE_FILES
@@ -116,7 +116,7 @@ class TestPythonRegistrySync:
         recipes = [
             r
             for r in RECIPES.values()
-            if r.build_system in ("skbuild", "python")
+            if r.build_system in PYTHON_BUILD_SYSTEMS
             and r.template_type == template_type
         ]
         assert len(recipes) == 1, (
@@ -139,7 +139,9 @@ class TestPythonRegistrySync:
                 assert LEGACY_TYPE_MAPPING[legacy] == recipe_path
 
     def test_type_descriptions_cover_every_template_set(self):
-        assert set(TEMPLATE_FILES) == set(SKBUILD_TYPES) | set(PY_PLAIN_TYPES)
+        assert set(TEMPLATE_FILES) == (
+            set(SKBUILD_TYPES) | set(MATURIN_TYPES) | set(PY_PLAIN_TYPES)
+        )
 
 
 class TestTemplateFilesExist:

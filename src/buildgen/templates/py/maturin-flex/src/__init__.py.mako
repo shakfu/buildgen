@@ -1,0 +1,1 @@
+<%include file="/maturin/src/__init__.py.mako"/>

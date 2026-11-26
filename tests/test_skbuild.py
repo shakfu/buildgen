@@ -11,6 +11,7 @@ from buildgen.skbuild.generator import (
     is_skbuild_type,
 )
 from buildgen.skbuild.templates import (
+    MATURIN_TYPES,
     PY_PLAIN_TYPES,
     SKBUILD_TYPES,
     TEMPLATE_FILES,
@@ -58,8 +59,9 @@ class TestTemplates:
 
     def test_types_are_registered_exactly_once(self):
         """Every TEMPLATE_FILES key is described by exactly one registry."""
-        assert set(TEMPLATE_FILES) == set(SKBUILD_TYPES) | set(PY_PLAIN_TYPES)
-        assert not set(SKBUILD_TYPES) & set(PY_PLAIN_TYPES)
+        registries = [set(SKBUILD_TYPES), set(MATURIN_TYPES), set(PY_PLAIN_TYPES)]
+        assert set(TEMPLATE_FILES) == set().union(*registries)
+        assert sum(map(len, registries)) == len(TEMPLATE_FILES)
         for template_type in TEMPLATE_FILES:
             assert get_type_description(template_type) != "Unknown template type"
 

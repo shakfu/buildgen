@@ -1,6 +1,7 @@
 <%page args="name, options={}, defaults={}" />\
 <%!
 from buildgen.common import versions as V
+from buildgen.skbuild.maturin import resolve as _maturin_options
 %>\
 <%
 raw_options = locals().get("options")
@@ -19,6 +20,7 @@ _matrix_versions = [min_python] if min_python == python_version else [min_python
 # pure_python: no compiled extension, so one wheel serves every platform and
 # the build leg collapses to a single runner.
 pure_python = bool(opts.get("pure_python", False))
+_rust_tests = bool(opts.get("maturin")) and _maturin_options(opts).rust_tests
 _matrix_os = ["ubuntu-latest"] if pure_python else ["ubuntu-latest", "macos-latest", "windows-latest"]
 _build_step = "Build wheel" if pure_python else "Build extension"
 %>\
@@ -67,6 +69,11 @@ jobs:
 
       - name: Run tests
         run: uv run pytest tests/ -v --cov=src/${name} --cov-report=xml
+% if _rust_tests:
+
+      - name: Run Rust tests
+        run: cargo test --no-default-features
+% endif
 
   build:
     name: Build (${"${{ matrix.os }}"}/${"${{ matrix.python-version }}"})

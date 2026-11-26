@@ -16,7 +16,9 @@
 
 - [ ] Add mixed recipes: `cpp/pybind11-catch2` (extension + tests)
 
-- [ ] Add Rust: `rust/executable`, `rust/lib`, `rust/py-pyo3`
+- [ ] Add Rust: `rust/executable`, `rust/lib`
+
+- [x] Add Rust Python extensions: `py/maturin`, `py/maturin-flex` (was `rust/py-pyo3`)
 
 - [ ] Add Go: `go/executable`, `go/lib`
 

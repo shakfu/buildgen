@@ -1,0 +1,1 @@
+<%include file="/maturin/src/lib.rs.mako"/>

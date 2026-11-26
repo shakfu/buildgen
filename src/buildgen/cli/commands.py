@@ -16,6 +16,7 @@ if TYPE_CHECKING:
 from mako.template import Template
 
 from buildgen.recipes import (
+    PYTHON_BUILD_SYSTEMS,
     RECIPES,
     Recipe,
     get_recipe,
@@ -56,11 +57,11 @@ def _config_file_path(recipe: "Recipe", output_dir: Path) -> Path:
 def _recipe_context(recipe: "Recipe") -> dict[str, Any] | None:
     """Template context implied by a recipe itself.
 
-    Only pure-Python recipes seed ``options`` from their defaults: for skbuild
-    recipes the options block is user-supplied (via a configurable recipe's
-    config file), so seeding it here would silently override that flow.
+    Only pure-Python and maturin recipes seed ``options`` from their defaults:
+    for skbuild recipes the options block is user-supplied (via a configurable
+    recipe's config file), so seeding it here would silently override that flow.
     """
-    if recipe.build_system == "python" and recipe.default_options:
+    if recipe.build_system in ("python", "maturin") and recipe.default_options:
         return {"options": dict(recipe.default_options)}
     return None
 
@@ -115,8 +116,8 @@ def cmd_new(args: argparse.Namespace) -> None:
 
     update_deps = not getattr(args, "no_update_deps", False)
 
-    # Handle Python recipes (py/*): scikit-build-core extensions and pure-Python
-    if recipe.build_system in ("skbuild", "python"):
+    # Handle Python recipes (py/*): skbuild and maturin extensions, pure-Python
+    if recipe.build_system in PYTHON_BUILD_SYSTEMS:
         gen = SkbuildProjectGenerator(
             name,
             recipe.template_type,
@@ -300,7 +301,7 @@ def cmd_test(args: argparse.Namespace) -> None:
             if project_dir.exists():
                 shutil.rmtree(project_dir)
 
-            if recipe.build_system in ("skbuild", "python"):
+            if recipe.build_system in PYTHON_BUILD_SYSTEMS:
                 gen = SkbuildProjectGenerator(
                     project_name,
                     recipe.template_type,
@@ -641,10 +642,9 @@ def cmd_render(args: argparse.Namespace) -> None:
     update_deps = not getattr(args, "no_update_deps", False)
     dry_run = getattr(args, "dry_run", False)
     force = getattr(args, "force", False)
-    skbuild_type = f"skbuild-{recipe.framework}"
     gen = SkbuildProjectGenerator(
         project_name,
-        skbuild_type,
+        recipe.template_type,
         output_dir,
         env_tool=env_tool,
         context={"options": options},
@@ -825,6 +825,10 @@ def _prepare_recipe_options(
         options.update(config_options)
     if override_env:
         options["env"] = override_env
+    if recipe.build_system == "maturin":
+        from buildgen.skbuild.maturin import resolve
+
+        resolve(options)  # raises ValueError on an invalid option
     return resolve_derived_options(recipe.name, options)
 
 

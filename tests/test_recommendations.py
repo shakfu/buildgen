@@ -24,6 +24,7 @@ def test_tool_diagnostics_are_machine_readable():
     )
     assert data["tools"]["cmake"]["available"] is True
     assert required_tools("python", "python") == {"python", "uv"}
+    assert required_tools("maturin", "rust") == {"python", "cargo", "uv"}
 
 
 def test_lock_round_trip_is_sorted_and_complete(tmp_path):

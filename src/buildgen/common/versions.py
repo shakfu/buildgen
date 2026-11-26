@@ -27,10 +27,12 @@ PYPI: dict[str, str] = {
     "pybind11-stubgen": "2.5.5",
     "scikit-build-core": "1.0.3",
     "uv-build": "0.12.6",
+    "maturin": "1.16.0",
+    "cffi": "2.1.1",
 }
 
 # Packages whose floor is a compatibility constraint, not a freshness target.
-BUILD_BACKENDS = frozenset({"scikit-build-core", "uv-build"})
+BUILD_BACKENDS = frozenset({"scikit-build-core", "uv-build", "maturin"})
 
 # Dev-group tools, in the order they appear in a generated pyproject.toml.
 DEV_TOOLS: tuple[str, ...] = ("mypy", "pytest", "pytest-cov", "ruff", "twine")
@@ -45,12 +47,18 @@ REQUIREMENT_NAMES: dict[str, str] = {"uv-build": "uv_build"}
 # https://docs.astral.sh/uv/concepts/build-backend/#choosing-a-build-backend
 CAPPED_AT_NEXT_MINOR = frozenset({"uv-build"})
 
+# Packages requiring an upper bound at the next major. maturin's pyproject
+# schema may change at 2.0; `uv init --build-backend maturin` writes `<2.0`.
+CAPPED_AT_NEXT_MAJOR = frozenset({"maturin"})
+
 # GitHub Actions refs, shared by this repo's workflows and the generated ones.
 ACTIONS: dict[str, str] = {
     "actions/checkout": "v7",
     "actions/download-artifact": "v8",
+    "actions/setup-python": "v7",
     "actions/upload-artifact": "v7",
     "astral-sh/setup-uv": "v10.0.1",
+    "PyO3/maturin-action": "v1",
     "docker/setup-qemu-action": "v4",
     "pypa/cibuildwheel": "v4.2",
     "pypa/gh-action-pypi-publish": "release/v1",
@@ -65,6 +73,10 @@ CMAKE: dict[str, str] = {
     "python_ext_min": "3.15",
     "flex_min": "3.18",
 }
+
+# crates.io requirements for generated Cargo.toml files. Cargo reads "0.30"
+# as ^0.30: >=0.30.0, <0.31.
+CRATES: dict[str, str] = {"pyo3": "0.30", "uniffi": "0.32"}
 
 # Language standard defaults for generated CMakeLists.txt.
 STANDARDS: dict[str, int] = {"cxx": 17, "c": 11}
@@ -108,6 +120,8 @@ def requirement(package: str, versions: dict[str, str] | None = None) -> str:
     name = REQUIREMENT_NAMES.get(package, package)
     if package in CAPPED_AT_NEXT_MINOR:
         return f"{name}>={version},<{next_minor(version)}"
+    if package in CAPPED_AT_NEXT_MAJOR:
+        return f"{name}>={version},<{int(version.split('.')[0]) + 1}.0"
     return f"{name}>={version}"
 
 

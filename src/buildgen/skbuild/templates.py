@@ -6,7 +6,9 @@ Supports override directories for customization.
 Template paths use recipe naming: py/pybind11, py/cython, py/cext, py/nanobind
 """
 
+from collections.abc import Callable
 from pathlib import Path
+from typing import Any
 
 from mako.template import Template
 
@@ -38,6 +40,12 @@ LEGACY_TO_RECIPE_PATH = {
 # build step -- keyed by recipe path rather than a legacy "skbuild-*" name.
 PY_PLAIN_TYPES = {
     "py/nodeps": "Pure-Python package with no runtime dependencies",
+}
+
+# Rust extensions built by maturin: no CMakeLists.txt, a Cargo.toml instead.
+MATURIN_TYPES = {
+    "py/maturin": "Python extension in Rust using PyO3 and maturin",
+    "py/maturin-flex": "maturin extension with configurable bindings and Rust tests",
 }
 
 # Mapping of template type to output file structure
@@ -127,6 +135,42 @@ TEMPLATE_FILES = {
         "src/${name}/py.typed": "src/py.typed.mako",
         "tests/test_${name}.py": "tests/test.py.mako",
     },
+    "py/maturin": {
+        ".gitignore": "common/gitignore.python.mako",
+        ".github/workflows/ci.yml": "common/github-workflows/ci.yml.mako",
+        ".github/workflows/build-publish.yml": "common/github-workflows/maturin-publish.yml.mako",
+        "CHANGELOG.md": "common/CHANGELOG.md.mako",
+        "LICENSE": "common/LICENSE.mako",
+        "TODO.md": "common/TODO.md.mako",
+        "Makefile": "common/Makefile.{env}.mako",
+        "pyproject.toml": "pyproject.toml.mako",
+        "README.md": "README.md.mako",
+        "Cargo.toml": "Cargo.toml.mako",
+        "src/lib.rs": "src/lib.rs.mako",
+        "src/${name}/__init__.py": "src/__init__.py.mako",
+        "src/${name}/_core.pyi": "src/_core.pyi.mako",
+        "src/${name}/py.typed": "src/py.typed.mako",
+        "tests/test_${name}.py": "tests/test.py.mako",
+    },
+    "py/maturin-flex": {
+        ".gitignore": "common/gitignore.python.mako",
+        ".github/workflows/ci.yml": "common/github-workflows/ci.yml.mako",
+        ".github/workflows/build-publish.yml": "common/github-workflows/maturin-publish.yml.mako",
+        "CHANGELOG.md": "common/CHANGELOG.md.mako",
+        "LICENSE": "common/LICENSE.mako",
+        "TODO.md": "common/TODO.md.mako",
+        "Makefile": "common/Makefile.{env}.mako",
+        "pyproject.toml": "pyproject.toml.mako",
+        "README.md": "README.md.mako",
+        "Cargo.toml": "Cargo.toml.mako",
+        "uniffi-bindgen.rs": "uniffi-bindgen.rs.mako",
+        "project.flex.json": "project.flex.json.mako",
+        "src/lib.rs": "src/lib.rs.mako",
+        "src/${name}/__init__.py": "src/__init__.py.mako",
+        "src/${name}/_core.pyi": "src/_core.pyi.mako",
+        "src/${name}/py.typed": "src/py.typed.mako",
+        "tests/test_${name}.py": "tests/test.py.mako",
+    },
     "skbuild-nanobind": {
         ".gitignore": "common/gitignore.python.mako",
         ".github/workflows/ci.yml": "common/github-workflows/ci.yml.mako",
@@ -146,10 +190,21 @@ TEMPLATE_FILES = {
 }
 
 
+# Files emitted only when a predicate on the template options holds, keyed by
+# template type then output path.
+FILE_CONDITIONS: dict[str, dict[str, Callable[[dict[str, Any]], bool]]] = {
+    "py/maturin-flex": {
+        "uniffi-bindgen.rs": lambda opts: opts.get("bindings") == "uniffi",
+    },
+}
+
+
 def get_type_description(template_type: str) -> str:
     """Human-readable description for a template registry key."""
     if template_type in SKBUILD_TYPES:
         return SKBUILD_TYPES[template_type]
+    if template_type in MATURIN_TYPES:
+        return MATURIN_TYPES[template_type]
     return PY_PLAIN_TYPES.get(template_type, "Unknown template type")
 
 

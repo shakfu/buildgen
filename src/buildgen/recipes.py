@@ -3,7 +3,8 @@
 Recipes use a `category/variant` naming convention:
 - cpp/executable, cpp/static, cpp/shared, etc.
 - c/executable, c/static, c/shared, etc.
-- py/pybind11, py/nanobind, py/cython, py/cext, py/nodeps
+- py/pybind11, py/nanobind, py/cython, py/cext, py/maturin, py/maturin-flex,
+  py/nodeps
 - quarto/project, quarto/document, quarto/presentation, quarto/dashboard,
   quarto/website, quarto/blog, quarto/book, quarto/manuscript
 """
@@ -21,9 +22,10 @@ class Recipe:
     description: str
     category: str  # e.g., "cpp", "c", "py", "quarto"
     variant: str  # e.g., "executable", "pybind11"
-    # "cmake", "skbuild", "python" (pure Python, no native build), or "quarto"
+    # "cmake", "skbuild", "maturin" (Rust extension), "python" (pure Python,
+    # no native build), or "quarto"
     build_system: str
-    language: str  # "c", "cpp", "cython", "python", "markdown"
+    language: str  # "c", "cpp", "cython", "rust", "python", "markdown"
     framework: str | None = None  # "pybind11", "nanobind", etc.
     configurable: bool = False
     config_template: str | None = None
@@ -38,6 +40,9 @@ class Recipe:
         """Template-registry key for this recipe's file map."""
         return self.template_key or f"skbuild-{self.framework}"
 
+
+# Build systems whose recipes render through SkbuildProjectGenerator.
+PYTHON_BUILD_SYSTEMS = ("skbuild", "maturin", "python")
 
 # Recipe registry with category/variant naming
 RECIPES: dict[str, Recipe] = {
@@ -207,6 +212,36 @@ RECIPES: dict[str, Recipe] = {
         build_system="skbuild",
         language="c",
         framework="c",
+    ),
+    "py/maturin": Recipe(
+        name="py/maturin",
+        description="Python extension in Rust using PyO3 and maturin",
+        category="py",
+        variant="maturin",
+        build_system="maturin",
+        language="rust",
+        framework="pyo3",
+        template_key="py/maturin",
+        default_options={"env": "uv", "maturin": True},
+    ),
+    "py/maturin-flex": Recipe(
+        name="py/maturin-flex",
+        description="maturin extension with configurable bindings and Rust tests",
+        category="py",
+        variant="maturin-flex",
+        build_system="maturin",
+        language="rust",
+        framework="pyo3",
+        template_key="py/maturin-flex",
+        configurable=True,
+        config_template="project.flex.json.mako",
+        default_options={
+            "env": "uv",
+            "maturin": True,
+            "bindings": "pyo3",
+            "abi3": True,
+            "rust_tests": True,
+        },
     ),
     "py/nodeps": Recipe(
         name="py/nodeps",

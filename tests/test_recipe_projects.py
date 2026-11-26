@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import ast
 import shutil
 import subprocess
+import tomllib
 from collections.abc import Callable
 from pathlib import Path
 
@@ -11,7 +13,7 @@ import pytest
 
 from buildgen.cmake.project_generator import CMakeProjectGenerator
 from buildgen.quarto.generator import QuartoProjectGenerator
-from buildgen.recipes import RECIPES, Recipe
+from buildgen.recipes import PYTHON_BUILD_SYSTEMS, RECIPES, Recipe
 from buildgen.skbuild.generator import SkbuildProjectGenerator
 
 CMAKE_AVAILABLE = shutil.which("cmake") is not None
@@ -22,6 +24,10 @@ COMPILABLE_RECIPES = sorted(
 SKBUILD_RECIPES = sorted(
     name for name, recipe in RECIPES.items() if recipe.build_system == "skbuild"
 )
+MATURIN_RECIPES = sorted(
+    name for name, recipe in RECIPES.items() if recipe.build_system == "maturin"
+)
+CARGO_AVAILABLE = shutil.which("cargo") is not None
 # Pure-Python recipes: rendered by the same generator, but with no native build.
 PY_PLAIN_RECIPES = sorted(
     name for name, recipe in RECIPES.items() if recipe.build_system == "python"
@@ -51,7 +57,7 @@ def _generate_project(
         generator = CMakeProjectGenerator(project_name, recipe_name, output_dir)
     elif recipe.build_system == "quarto":
         generator = QuartoProjectGenerator(project_name, recipe_name, output_dir)
-    elif recipe.build_system in ("skbuild", "python"):
+    elif recipe.build_system in ("skbuild", "maturin", "python"):
         skbuild_type = recipe.template_type
         env_tool = recipe.default_options.get("env", "uv")
         context = {}
@@ -132,8 +138,9 @@ def _run_command(cmd: list[str], cwd: Path, label: str) -> None:
 
 
 def _build_skbuild_project(project_dir: Path) -> None:
-    """Run uv sync and python -m build for a skbuild project."""
+    """Run uv sync, the generated CI's mypy check, and uv build."""
     _run_command(["uv", "sync"], cwd=project_dir, label="uv sync")
+    _run_command(["uv", "run", "mypy", "src", "tests"], cwd=project_dir, label="mypy")
     _run_command(["uv", "build"], cwd=project_dir, label="uv build")
 
 
@@ -157,6 +164,64 @@ def test_recipe_generates(build_project_dir_factory, recipe_name):
     else:
         assert (project_dir / "pyproject.toml").exists()
         assert not (project_dir / "CMakeLists.txt").exists()
+
+
+@pytest.mark.parametrize("recipe_name", MATURIN_RECIPES)
+def test_maturin_recipes_are_rust_extensions(build_project_dir_factory, recipe_name):
+    """maturin recipes build a Rust crate, with no CMake in the loop."""
+    _, project_dir = _generate_project(recipe_name, build_project_dir_factory)
+    name = _sanitized_project_name(recipe_name)
+
+    pyproject = tomllib.loads((project_dir / "pyproject.toml").read_text())
+    assert pyproject["build-system"]["build-backend"] == "maturin"
+    assert pyproject["build-system"]["requires"][0].endswith(",<2.0")
+    assert pyproject["tool"]["maturin"]["module-name"] == f"{name}._core"
+    assert "scikit-build" not in pyproject["tool"]
+    assert not (project_dir / "CMakeLists.txt").exists()
+
+    # The cdylib name must match the module-name suffix, or import fails.
+    cargo = tomllib.loads((project_dir / "Cargo.toml").read_text())
+    assert cargo["lib"]["name"] == "_core"
+    assert cargo["lib"]["crate-type"] == ["cdylib"]
+    floor = pyproject["project"]["requires-python"].removeprefix(">=")
+    abi3 = "abi3-py" + floor.replace(".", "")
+    assert abi3 in cargo["dependencies"]["pyo3"]["features"]
+
+    publish = (project_dir / ".github/workflows/build-publish.yml").read_text()
+    assert "PyO3/maturin-action" in publish
+    assert "cibuildwheel" not in publish
+
+    makefile = (project_dir / "Makefile").read_text()
+    assert "rm -rf target/" in makefile
+    assert "CMakeCache.txt" not in makefile
+    assert "target/" in (project_dir / ".gitignore").read_text()
+
+
+@pytest.mark.parametrize("recipe_name", MATURIN_RECIPES)
+def test_maturin_recipes_build(
+    build_project_dir_factory, recipe_name, build_skbuild_enabled
+):
+    """maturin recipes should sync, pass their tests, and build an abi3 wheel."""
+    if not build_skbuild_enabled:
+        pytest.skip("Disabled via --skip-skbuild-build")
+    if not CARGO_AVAILABLE:
+        pytest.skip("cargo not available")
+
+    _, project_dir = _generate_project(recipe_name, build_project_dir_factory)
+    _run_command(["uv", "sync"], cwd=project_dir, label="uv sync")
+    _run_command(["uv", "run", "pytest", "-q"], cwd=project_dir, label="pytest")
+    _run_command(["uv", "run", "mypy", "src", "tests"], cwd=project_dir, label="mypy")
+    if RECIPES[recipe_name].default_options.get("rust_tests"):
+        _run_command(
+            ["cargo", "test", "--no-default-features"],
+            cwd=project_dir,
+            label="cargo test",
+        )
+    _run_command(["uv", "build", "--wheel"], cwd=project_dir, label="uv build")
+
+    wheels = list((project_dir / "dist").glob("*.whl"))
+    assert len(wheels) == 1, f"expected one wheel, got {wheels}"
+    assert "-abi3-" in wheels[0].name, wheels[0].name
 
 
 @pytest.mark.parametrize("recipe_name", COMPILABLE_RECIPES)
@@ -213,6 +278,7 @@ def test_py_plain_recipes_build(
     _, project_dir = _generate_project(recipe_name, build_project_dir_factory)
     _run_command(["uv", "sync"], cwd=project_dir, label="uv sync")
     _run_command(["uv", "run", "pytest", "-q"], cwd=project_dir, label="pytest")
+    _run_command(["uv", "run", "mypy", "src", "tests"], cwd=project_dir, label="mypy")
     _run_command(["uv", "build"], cwd=project_dir, label="uv build")
 
     wheels = list((project_dir / "dist").glob("*.whl"))
@@ -284,3 +350,24 @@ def test_native_recipes_typecheck_the_compiled_module(
     assert "[[tool.mypy.overrides]]" in pyproject
     assert f'module = "{project_name}._core"' in pyproject
     assert "ignore_missing_imports = true" in pyproject
+
+
+PY_RECIPES = sorted(
+    name
+    for name, recipe in RECIPES.items()
+    if recipe.build_system in PYTHON_BUILD_SYSTEMS
+)
+
+
+@pytest.mark.parametrize("recipe_name", PY_RECIPES)
+def test_generated_tests_are_annotated(build_project_dir_factory, recipe_name):
+    """Generated CI runs `mypy --strict` over tests/, which rejects `def test_x():`."""
+    _, project_dir = _generate_project(recipe_name, build_project_dir_factory)
+    for path in (project_dir / "tests").rglob("*.py"):
+        tree = ast.parse(path.read_text())
+        bare = [
+            node.name
+            for node in ast.walk(tree)
+            if isinstance(node, ast.FunctionDef) and node.returns is None
+        ]
+        assert not bare, f"{path.name}: unannotated {bare}"

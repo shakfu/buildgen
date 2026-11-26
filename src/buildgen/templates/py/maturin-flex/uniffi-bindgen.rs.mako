@@ -1,0 +1,1 @@
+<%include file="/maturin/uniffi-bindgen.rs.mako"/>

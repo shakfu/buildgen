@@ -18,6 +18,7 @@ from buildgen.common.deps import (
     resolve_latest_versions,
 )
 from buildgen.skbuild.templates import (
+    FILE_CONDITIONS,
     SKBUILD_TYPES,
     TEMPLATE_FILES,
     get_type_description,
@@ -148,6 +149,13 @@ class SkbuildProjectGenerator:
         self.resolved_templates = resolve_template_files(
             template_type, env_tool, project_dir
         )
+        conditions = FILE_CONDITIONS.get(template_type, {})
+        options = self.context["options"]
+        self.resolved_templates = {
+            path: entry
+            for path, entry in self.resolved_templates.items()
+            if path not in conditions or conditions[path](options)
+        }
 
     def _render_path(self, path_template: str) -> Path:
         """Render a path template with the project name.

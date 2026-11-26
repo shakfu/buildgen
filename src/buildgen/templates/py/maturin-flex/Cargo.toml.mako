@@ -1,0 +1,1 @@
+<%include file="/maturin/Cargo.toml.mako"/>

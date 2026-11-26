@@ -4,6 +4,18 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.6.0]
+
+### Added
+
+- **`py/maturin` recipe** - a Rust extension using [PyO3](https://pyo3.rs), built by [maturin](https://www.maturin.rs), in the layout of `uv init --build-backend maturin`. The crate builds abi3 wheels at the `requires-python` floor, so the release workflow uses `PyO3/maturin-action` with one wheel per platform instead of a cibuildwheel per-version matrix. `pyproject.toml` lists the Rust sources in `[tool.uv] cache-keys`; without them `uv sync` keeps a stale extension after a `src/lib.rs` edit. pyo3 is 0.30 without the `extension-module` feature, which 0.30 deprecates: maturin sets `PYO3_BUILD_EXTENSION_MODULE` instead. `Recipe.build_system` gains `"maturin"`; `doctor` reports `cargo`. maturin is pinned `<2.0` through a new `CAPPED_AT_NEXT_MAJOR` set.
+
+- **`py/maturin-flex` recipe** - a configurable `py/maturin` (`buildgen new`, edit `project.flex.json`, `buildgen render`). Options: `bindings` (`pyo3`, `cffi`, `uniffi`), `abi3` (pyo3 only; off builds one wheel per CPython via `--find-interpreter`), and `rust_tests` (Rust unit tests, `make test-rust`, a CI step). pyo3 sits behind a default `python` feature, so `cargo test --no-default-features` builds a test binary that does not link libpython. cffi and uniffi make maturin write `src/<name>/_core/` on every editable install; a later `uv build` failed with "overwrote an existing tracked file" until that directory was excluded from the wheel, mypy, ruff, and git. uniffi uses an in-crate `uniffi-bindgen` binary over the PyPI `uniffi-bindgen`, which lags the crate (0.31 vs 0.32). `render` now rejects an unknown option value instead of rendering pyo3 output.
+
+### Fixed
+
+- **Generated `py/*` projects failed their own CI type check.** The CI workflow runs `mypy src/<name> tests/` under `strict = true`, and the test templates for `pybind11`, `pybind11-flex`, `nanobind`, `cython`, `cext`, and `nodeps` declared `def test_x():` with no return annotation. Each test function now returns `-> None`.
+
 ## [0.5.0]
 
 ### Added

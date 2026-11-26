@@ -1,6 +1,7 @@
-<%page args="name, framework, framework_pkg, description, lang_classifier, defaults={}, user={}, options={}, dep_versions={}, native=True, keywords=None" />
+<%page args="name, framework, framework_pkg, description, lang_classifier, defaults={}, user={}, options={}, dep_versions={}, native=True, keywords=None, maturin=False" />
 <%!
 from buildgen.common import versions as V
+from buildgen.skbuild.maturin import resolve as _maturin_options
 %>\
 <%
 # Handle optional extra build requirements
@@ -14,6 +15,10 @@ _dv = {**V.PYPI, **(dep_versions if isinstance(dep_versions, dict) else {})}
 _py_min_minor = int(_python_version.split(".")[1])
 _py_max_minor = max(int(V.PYTHON["max_classifier_minor"]), _py_min_minor)
 # native=False -> pure-Python distribution: no compiler, no CMake, uv_build backend.
+_m = _maturin_options(options) if maturin else None
+# cffi and uniffi: maturin writes the Python side of _core into the source tree
+# on an editable install. Lint, type-check, and package only the stub.
+_generated = f"src/{name}/_core" if _m and _m.generated_module else None
 _keywords = keywords if keywords else ([framework, "python", "extension"] if native else ["python", "library"])
 %>
 [project]
@@ -41,6 +46,9 @@ keywords = [${", ".join('"%s"' % k for k in _keywords)}]
 # This project intentionally has no runtime dependencies.
 dependencies = []
 % endif
+% if _m and _m.bindings == "cffi":
+dependencies = ["${V.requirement('cffi', _dv)}; platform_python_implementation != 'PyPy'"]
+% endif
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Programming Language :: Python :: 3",
@@ -64,7 +72,33 @@ dev = [
 % endfor
 ]
 
-% if native:
+% if maturin:
+[build-system]
+requires = ["${V.requirement('maturin', _dv)}"]
+build-backend = "maturin"
+
+[tool.maturin]
+% if _m.bindings != "pyo3":
+bindings = "${_m.bindings}"
+% endif
+module-name = "${name}._core"
+python-source = "src"
+exclude = ["**/__pycache__/**"${f', "{_generated}/**"' if _generated else ''}]
+
+[tool.uv]
+# uv caches the built wheel by these keys; without the Rust sources here,
+# `uv sync` would not rebuild after a src/lib.rs edit.
+cache-keys = [{ file = "pyproject.toml" }, { file = "Cargo.toml" }, { file = "Cargo.lock" }, { file = "src/**/*.rs" }]
+
+[tool.mypy]
+strict = true
+% if _generated:
+exclude = ["${_generated}/"]
+
+[tool.ruff]
+extend-exclude = ["${_generated}"]
+% endif
+% elif native:
 [build-system]
 requires = ["${V.requirement('scikit-build-core', _dv)}"${extra_requires}]
 build-backend = "scikit_build_core.build"

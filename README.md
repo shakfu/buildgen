@@ -388,6 +388,13 @@ buildgen list
 | `py/cython` | Extension using Cython |
 | `py/cext` | C extension (Python.h) |
 
+**Rust Extension Recipes** (maturin):
+
+| Recipe | Description |
+|--------|-------------|
+| `py/maturin` | Rust extension using PyO3 |
+| `py/maturin-flex` | Rust extension with configurable bindings (pyo3, cffi, uniffi), abi3, and Rust tests |
+
 **Pure Python Recipes** (uv_build, no native build):
 
 | Recipe | Description |
@@ -475,6 +482,49 @@ ruff, mypy) lives in the `dev` dependency group, so it is not part of the
 published distribution. The generated test suite asserts that the installed
 distribution declares no runtime requirements, so the invariant is enforced
 rather than merely documented.
+
+### Rust Extension Projects
+
+The `py/maturin` recipe generates a [PyO3](https://pyo3.rs) extension built by
+[maturin](https://www.maturin.rs). It needs `cargo` on `PATH`; uv fetches
+maturin as a build dependency.
+
+```bash
+buildgen new myext -r py/maturin
+```
+
+```text
+myext/
+  pyproject.toml      # maturin backend, uv cache-keys on the Rust sources
+  Cargo.toml          # cdylib crate `_core`, pyo3 with abi3
+  Makefile            # Convenience wrapper
+  src/lib.rs          # Rust extension source
+  src/myext/
+    __init__.py       # Python package
+    _core.pyi         # Type stubs for the extension
+    py.typed          # PEP 561 marker
+  tests/
+    test_myext.py     # pytest tests
+  .github/workflows/  # ci.yml + build-publish.yml (PyO3/maturin-action)
+```
+
+The layout matches `uv init --build-backend maturin`. The crate targets the
+stable ABI (abi3) at the `requires-python` floor, so one wheel per platform
+covers every later CPython. Free-threaded builds are not abi3-compatible and
+are not built.
+
+`py/maturin-flex` writes a `project.flex.json` first. Edit its `options`, then
+run `buildgen render project.flex.json`:
+
+| Option | Values | Effect |
+|--------|--------|--------|
+| `bindings` | `pyo3` (default), `cffi`, `uniffi` | Binding layer between `src/lib.rs` and Python |
+| `abi3` | `true` (default), `false` | pyo3 only: one stable-ABI wheel per platform, or one per CPython version |
+| `rust_tests` | `true` (default), `false` | Rust unit tests, `make test-rust`, and a CI `cargo test` step |
+
+Every variant exposes the same typed Python API and ships `_core.pyi`. With
+`cffi` or `uniffi`, maturin generates `src/<name>/_core/` on each build; the
+project excludes it from git, the wheel, mypy, and ruff.
 
 The `py/pybind11-flex` recipe additionally drops a `project.flex.json` whose
 `options` block toggles the native Catch2/GTest harness and the optional
@@ -730,6 +780,11 @@ own content, or keep the include and place your modified base alongside your
 override at `.buildgen/templates/py/pybind11/common/pyproject.base.toml.mako`,
 which Mako *will* find because it sits under the overriding template's
 directory.
+
+`py/maturin-flex` uses the same mechanism: each of its templates includes the
+matching built-in `py/maturin` template. Overriding a `py/maturin` template
+therefore does not change `py/maturin-flex` output; override the
+`py/maturin-flex` file as well.
 
 ## Low-Level API
 

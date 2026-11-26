@@ -45,6 +45,7 @@ def discover_tools() -> dict[str, ToolInfo]:
         "python": "python3",
         "uv": "uv",
         "quarto": "quarto",
+        "cargo": "cargo",
     }
     tools: dict[str, ToolInfo] = {}
     for name, executable in candidates.items():
@@ -61,6 +62,9 @@ def required_tools(build_system: str, language: str) -> set[str]:
         return {"quarto", "make"}
     if build_system == "skbuild":
         return {"python", "cmake", "uv"}
+    if build_system == "maturin":
+        # uv fetches maturin itself as a build dependency.
+        return {"python", "cargo", "uv"}
     required = {"cmake", "make"}
     if language == "c":
         required.add("cc")
@@ -102,6 +106,13 @@ INSTALL_HINTS: dict[str, dict[str, str]] = {
         "dnf": "curl -LsSf https://astral.sh/uv/install.sh | sh",
         "pacman": "sudo pacman -S uv",
         "winget": "winget install astral-sh.uv",
+    },
+    "cargo": {
+        "darwin": "curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh",
+        "apt": "curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh",
+        "dnf": "curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh",
+        "pacman": "sudo pacman -S rustup && rustup default stable",
+        "winget": "winget install Rustlang.Rustup",
     },
     "quarto": {
         "darwin": "brew install --cask quarto",

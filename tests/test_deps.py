@@ -25,6 +25,8 @@ class TestDefaultVersions:
             "pybind11-stubgen",
             "scikit-build-core",
             "uv-build",
+            "maturin",
+            "cffi",
         }
         assert expected == set(DEFAULT_VERSIONS.keys())
 

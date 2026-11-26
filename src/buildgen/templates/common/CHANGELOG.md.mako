@@ -6,7 +6,8 @@ h2 = "##"
 h3 = "###"
 _opts = context.get("options") or {}
 _pure = bool(_opts.get("pure_python", False))
-_backend = "uv_build" if _pure else "scikit-build-core"
+_maturin = bool(_opts.get("maturin", False))
+_backend = "uv_build" if _pure else ("maturin" if _maturin else "scikit-build-core")
 %>\
 # Changelog
 

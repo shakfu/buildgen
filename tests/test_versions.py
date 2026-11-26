@@ -36,6 +36,8 @@ class TestRegistryShape:
 
     def test_capped_packages_are_all_in_pypi(self):
         assert set(versions.PYPI) >= versions.CAPPED_AT_NEXT_MINOR
+        assert set(versions.PYPI) >= versions.CAPPED_AT_NEXT_MAJOR
+        assert not versions.CAPPED_AT_NEXT_MINOR & versions.CAPPED_AT_NEXT_MAJOR
 
     def test_requirement_names_are_all_in_pypi(self):
         assert set(versions.REQUIREMENT_NAMES) <= set(versions.PYPI)
@@ -96,6 +98,12 @@ class TestRequirement:
 
     def test_uv_build_is_capped_at_the_next_minor(self):
         assert versions.requirement("uv-build") == "uv_build>=0.12.6,<0.13"
+
+    def test_maturin_is_capped_at_the_next_major(self):
+        assert (
+            versions.requirement("maturin", {"maturin": "1.16.0"})
+            == "maturin>=1.16.0,<2.0"
+        )
 
     def test_cap_tracks_the_resolved_version(self):
         """A PyPI-resolved uv-build must move its own upper bound with it."""
